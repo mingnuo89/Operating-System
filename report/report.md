@@ -185,9 +185,9 @@ riscv64-unknown-elf-nm -n bin/kernel
 | `bootstacktop` | `0x80203000` | 启动栈高地址边界 |
 | `edata`、`end` | 均为 `0x80203008` | 本次需要清零的区间长度为零 |
 
-![图 B-1：使用 readelf 检查 ELF 入口地址](evidence/part2/00-elf-entry.png)
+![图 B-1：使用 readelf 检查 ELF 入口地址](images/part2/00-elf-entry.png)
 
-![图 B-2：使用 nm 检查入口函数与启动栈的地址](evidence/part2/01-symbols.png)
+![图 B-2：使用 nm 检查入口函数与启动栈的地址](images/part2/01-symbols.png)
 
 把这些结果与链接脚本对应起来之后，内存布局就不再只是几段抽象的名称。例如，`.rodata` 结束后并没有立即接 `.data`，而是经过对齐后从 `0x80201000` 开始。启动栈也确实占用了这里预留的空间。
 
@@ -214,7 +214,7 @@ sp = 0x80202ff0
 
 它比初始值 `0x80203000` 小 16 字节。后续指令会将 `ra` 保存到 `8(sp)`，并调用 `memset`。这说明设置栈并不是一个形式上的步骤，C 函数确实马上开始使用这块内存。
 
-![图 B-4：进入 C 函数后，栈指针下降 16 字节](evidence/part2/03-kern-init.png)
+![图 B-4：进入 C 函数后，栈指针下降 16 字节](images/part2/03-kern-init.png)
 
 完成准备后，函数调用 `cprintf` 输出启动信息，并停留在 `while (1)` 中。输出的实现由输出模块分析。对于本部分，我更关注进入这些函数之前，栈和数据区域是否已经准备好。
 
@@ -291,7 +291,7 @@ sp = 0x80203000
 
 `sp` 与 `bootstacktop` 的地址相等，两个栈边界之差也确实为 8192 字节。`entry.S` 已经预留了栈的空间，这条指令让后续函数从正确的位置开始使用它。
 
-![图 B-3：逐条执行 GDB 命令，观察设置栈后的寄存器变化](evidence/part2/02-entry-stack.png)
+![图 B-3：逐条执行 GDB 命令，观察设置栈后的寄存器变化](images/part2/02-entry-stack.png)
 
 图中 GDB 在 `0x80203000` 后显示了 `SBI_CONSOLE_PUTCHAR`，是因为这个变量与 `bootstacktop` 恰好具有同一数值地址。`bootstacktop` 标记的是栈的边界，栈向更低地址使用；这不表示栈指针设置错误。
 
@@ -455,11 +455,11 @@ riscv64-unknown-elf-readelf -h bin/kernel | grep "Entry point"
 Entry point address:               0x80200000
 ```
 
-![内核编译及镜像生成](evidence/part1/build-kernel.png)
+![内核编译及镜像生成](images/part1/build-kernel.png)
 
 *内核源文件编译、ELF 链接及 `ucore.img` 镜像生成过程。*
 
-![验证内核入口地址](evidence/part1/verify-kernel-entry-address.png)
+![验证内核入口地址](images/part1/verify-kernel-entry-address.png)
 
 *使用 `readelf` 验证 ELF 入口地址为 `0x80200000`。*
 
@@ -488,7 +488,7 @@ make gdb
 
 `make gdb` 使用带调试符号的 `bin/kernel`，把体系结构设置为 `riscv:rv64`，并连接 `localhost:1234`。
 
-![GDB连接QEMU](evidence/part1/gdb-connect-reset-address.png)
+![GDB连接QEMU](images/part1/gdb-connect-reset-address.png)
 
 *GDB 载入内核符号、设置 RISC-V 64 位体系结构并连接 QEMU，连接后停在复位地址 `0x1000`。*
 
@@ -525,11 +525,11 @@ pc = 0x1000
 
 这些指令位于 QEMU 提供的 MROM 中，不属于 ucore 内核。它们取得 hart 编号、设备树地址和固件动态信息地址，再从 MROM 数据区取出 `0x80000000`，跳转到 OpenSBI。
 
-![复位后的程序计数器](evidence/part1/reset-program-counter.png)
+![复位后的程序计数器](images/part1/reset-program-counter.png)
 
 *读取 PC 寄存器，确认 RISC-V 处理器的复位地址为 `0x1000`。*
 
-![复位向量指令](evidence/part1/reset-vector-instructions.png)
+![复位向量指令](images/part1/reset-vector-instructions.png)
 
 *反汇编 `0x1000` 处的 MROM 复位代码。*
 
@@ -569,11 +569,11 @@ OpenSBI 入口处的指令为：
 0x8000000c: jal 0x80000580
 ```
 
-![单步进入OpenSBI](evidence/part1/step-to-opensbi-registers.png)
+![单步进入OpenSBI](images/part1/step-to-opensbi-registers.png)
 
 *单步执行六条复位指令后，PC 到达 `0x80000000`，同时观察 OpenSBI 的入口参数。*
 
-![OpenSBI入口指令](evidence/part1/opensbi-entry-instructions.png)
+![OpenSBI入口指令](images/part1/opensbi-entry-instructions.png)
 
 *OpenSBI 入口处的寄存器状态与前八条机器指令。*
 
@@ -587,7 +587,7 @@ Domain0 Next Mode         : S-mode
 
 这表明 OpenSBI 将以 S-mode 进入地址 `0x80200000` 的内核。
 
-![OpenSBI下一阶段信息](evidence/part1/opensbi-next-stage-info.png)
+![OpenSBI下一阶段信息](images/part1/opensbi-next-stage-info.png)
 
 *OpenSBI 输出的下一阶段地址、参数和特权级，其中 `Next Address` 为 `0x80200000`，`Next Mode` 为 S-mode。*
 
@@ -622,11 +622,11 @@ sp = 0x80046eb0
 
 断点命中 `kern_entry`，直接证明 OpenSBI 已经把控制权交给 ucore 内核。
 
-![内核入口断点](evidence/part1/kernel-entry-breakpoint.png)
+![内核入口断点](images/part1/kernel-entry-breakpoint.png)
 
 *在 `0x80200000` 设置的断点命中 `kern_entry`，此时内核第一条指令尚未执行。*
 
-![内核入口反汇编](evidence/part1/kernel-entry-disassembly.png)
+![内核入口反汇编](images/part1/kernel-entry-disassembly.png)
 
 *反汇编内核入口，可看到设置栈指针的指令以及跳转到 `kern_init()` 的指令。*
 
@@ -665,19 +665,19 @@ sp = 0x80203000
 
 这证明 `tail kern_init` 完成了从汇编入口到 C 语言入口的控制权转移，同时保持了刚建立的内核栈。
 
-![建立内核栈](evidence/part1/kernel-stack-pointer.png)
+![建立内核栈](images/part1/kernel-stack-pointer.png)
 
 *执行 `la sp, bootstacktop` 后，栈指针变为 `0x80203000`。*
 
-![tail跳转指令](evidence/part1/tail-kern-init-disassembly.png)
+![tail跳转指令](images/part1/tail-kern-init-disassembly.png)
 
 *当前 PC 指向 `tail kern_init` 展开的跳转指令，目标地址为 `0x8020000a`。*
 
-![进入kern_init](evidence/part1/entered-kern-init-registers.png)
+![进入kern_init](images/part1/entered-kern-init-registers.png)
 
 *执行跳转后进入 `kern_init()`，内核栈指针保持为 `0x80203000`。*
 
-![kern_init反汇编](evidence/part1/kern-init-disassembly.png)
+![kern_init反汇编](images/part1/kern-init-disassembly.png)
 
 *`kern_init()` 函数入口处的前五条机器指令。*
 
@@ -696,7 +696,7 @@ QEMU 终端输出：
 (THU.CST) os is loading ...
 ```
 
-![内核启动成功](evidence/part1/kernel-boot-success.png)
+![内核启动成功](images/part1/kernel-boot-success.png)
 
 *QEMU 终端成功输出内核启动信息，说明最小内核启动链和 SBI 控制台输出均正常。*
 
@@ -976,11 +976,11 @@ riscv64-unknown-elf-objcopy bin/kernel --strip-all -O binary bin/ucore.img
 
 本阶段的两张图片分别展示调试连接与入口断点，以及正常运行后的输出。第一张展示的是 `make debug` 和 GDB，不作为编译过程的截图。
 
-![图 C-1：运行验证环境中的 GDB 连接与内核入口断点](evidence/part3/5.1.png)
+![图 C-1：运行验证环境中的 GDB 连接与内核入口断点](images/5.1.png)
 
 图 C-1 中，GDB 连接后先停在 `0x1000`，随后断点命中 `0x80200000` 的 `kern_entry`。它验证了调试连接和入口控制流，不能单独证明完整的编译过程。
 
-![图 C-2：执行 make qemu 后的启动输出](evidence/part3/5.2.png)
+![图 C-2：执行 make qemu 后的启动输出](images/5.2.png)
 
 图 C-2 输出 `(THU.CST) os is loading ...`，说明该环境中内核已经进入初始化函数，并能够通过格式化输出和 SBI 服务向终端输出信息。它验证了本实验用到的路径，不代表完整输入输出、内存管理或其他内核功能均已实现。
 
@@ -1065,15 +1065,15 @@ UCOREIMG  := $(call totarget,ucore.img)
 
 正文保留了各阶段的完整取证图片。以下集中列出编译、运行和入口调试结果，便于核对：
 
-![编译、链接与镜像生成结果](evidence/part1/build-kernel.png)
+![编译、链接与镜像生成结果](images/part1/build-kernel.png)
 
 交叉编译、ELF 链接和原始镜像转换完成。ELF 入口与符号检查见练习二及内存布局模块。
 
-![make qemu 启动结果](evidence/part3/5.2.png)
+![make qemu 启动结果](images/5.2.png)
 
 启动信息验证了本实验使用的 C 初始化和 SBI 输出路径。各成员环境不同，固件版本和输出字段不要求完全一致。
 
-![入口栈设置的 GDB 验证](evidence/part2/02-entry-stack.png)
+![入口栈设置的 GDB 验证](images/part2/02-entry-stack.png)
 
 单步后 sp 与 bootstacktop 一致，证明入口代码切换到了内核自己的启动栈。
 
