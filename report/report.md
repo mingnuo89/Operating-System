@@ -228,24 +228,6 @@ sp = 0x80202ff0
 **操作要求**：只阅读、分析和验证已有框架，不改动内核源码、Makefile、链接脚本或工具配置。以当前工程为准，不按其他 uCore 版本补出不存在的代码。运行验证前说明命令、预期观察点和退出方法；没有实际执行的结果必须明确标为未验证。
 **输出要求**：使用下面四段信息，交付源码位置、模块职责、练习答案和可核对的验证依据；区分已有实现、当前观察和未验证的推断。不要生成虚构的截图、提示词历史或迭代次数。
 
-[RELY]
-以下定义来自当前工程，路径相对于 code/lab1：
-```c
-#define PGSIZE 4096
-#define PGSHIFT 12
-#define KSTACKPAGE 2
-#define KSTACKSIZE (KSTACKPAGE * PGSIZE)
-int kern_init(void) __attribute__((noreturn));
-void *memset(void *s, char c, size_t n);
-extern char edata[], end[];
-```
-```ld
-OUTPUT_ARCH(riscv)
-ENTRY(kern_entry)
-BASE_ADDRESS = 0x80200000;
-```
-kern_entry 为汇编标签；bootstack 与 bootstacktop 分别标记启动栈的低、高地址边界。当前 entry.S 使用 .text，而非单独的 .text.kern_entry。可用 readelf、nm、objdump 与 GDB 检查生成文件和运行状态，不能将原报告中的符号地址当作以后所有构建的固定值。
-
 [GUARANTEE]
 本任务是既有代码分析，不要求实现或修改函数。必须核对以下现有接口及对应行为：
 ```c
