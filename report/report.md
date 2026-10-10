@@ -55,7 +55,7 @@
 | 成员 | 实验环境与工具 | 说明 |
 | --- | --- | --- |
 | 吴宇轩 | Ubuntu 24.04（WSL2）；QEMU 8.2.2；GDB multiarch 15.1；RISC-V GCC 13.2.0 | 在个人实验副本中使用 -kernel 解决新版 QEMU 的入口传递问题，使用多架构 GDB |
-| 张祖浩 | Apple Silicon macOS；Docker 中的 ARM64 Ubuntu 24.04；QEMU 8.2.2；GDB multiarch 15.1； | 容器包装命令为原有加载参数补充 -kernel，保留课程 Makefile；使用独立 Otty 窗口取证 |
+| 张祖浩 | Apple Silicon macOS；Docker 中的 ARM64 Ubuntu 24.04；QEMU；GDB multiarch 15.1； | 容器包装命令为原有加载参数补充 -kernel，保留课程 Makefile；|
 | 吕明诺 | Ubuntu 虚拟机；RISC-V 工具链；QEMU；DeepSeek-V4-Flash | 原始截图显示 OpenSBI v0.4；其环境与其他成员不同，未提供的工具版本不另作推断 |
 
 报告中的符号地址和寄存器值对应截图所属成员的构建与运行环境。除约定的加载地址外，其他地址不应视为所有环境都固定不变。AI 工具用于分析和文字整理，其回答需与实际代码和调试记录核对。
