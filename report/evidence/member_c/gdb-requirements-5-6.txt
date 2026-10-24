@@ -1,0 +1,33 @@
+Member C GDB requirements 5 and 6, 2026-10-24
+
+Observed compatibility detail:
+
+1. With QEMU 8.2.2 and the old command
+   -device loader,file=bin/ucore.img,addr=0x80200000
+   OpenSBI printed:
+   Domain0 Next Address      : 0x0000000000000000
+   The kernel never received control.
+
+2. With
+   -kernel bin/ucore.img
+   OpenSBI printed:
+   Domain0 Next Address      : 0x0000000080200000
+   The kernel entered kern_entry and completed the PMM/MMU/SLUB checks.
+
+AI-assisted diagnosis record:
+
+- Situation: after the A+B merge compiled successfully, QEMU showed only the
+  OpenSBI banner. There was no kernel panic or assertion output.
+- Initial hypothesis: the merged entry code or page table might be invalid.
+- Investigation suggested by the AI: first compare OpenSBI's "Next Address"
+  against the expected 0x80200000 before debugging allocator code; inspect both
+  the Makefile and the independent grading script for their QEMU arguments.
+- Experiment: keep the same image and replace only `-device loader` with
+  `-kernel`.
+- Result: Next Address changed from 0 to 0x80200000 and the kernel tests ran.
+- Follow-up: update both `make qemu` and `tools/grade.sh`; `make grade` then
+  changed from missing both test markers to 20/20.
+
+Conclusion: a successful load into guest RAM is not the same as telling
+OpenSBI where its next-stage entry is. Checking the firmware hand-off fields
+prevented an unrelated allocator debugging detour.

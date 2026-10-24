@@ -1,0 +1,27 @@
+Member C Buddy validation, 2026-10-24
+
+Build configuration:
+  make clean
+  make -j2 EXTRA_CFLAGS=-DPMM_BUDDY
+
+Default 128 MiB result:
+  memory management: buddy_pmm_manager
+  buddy_check() succeeded! (rounding, split, merge, count)
+  check_alloc_page() succeeded!
+  MMU probe: three loads agree, value=0x1122334455667788
+  SLUB sizes/alignment/data/large allocations: PASS
+  SLUB multi-page/reuse/reclaim/failure: PASS
+  SLUB true exhaustion/cached object/recovery: PASS
+  slub_check() succeeded!
+
+64 MiB result:
+  Size: 0x0000000004000000 (64 MB)
+  memory management: buddy_pmm_manager
+  buddy_check() succeeded! (rounding, split, merge, count)
+  slub_check() succeeded!
+
+256 MiB result:
+  Size: 0x0000000010000000 (256 MB)
+  memory management: buddy_pmm_manager
+  buddy_check() succeeded! (rounding, split, merge, count)
+  slub_check() succeeded!

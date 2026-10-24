@@ -4,10 +4,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <dtb.h>
+#include <slub.h>
 
 int kern_init(void) __attribute__((noreturn));
 void grade_backtrace(void);
 void print_kerninfo(void);
+void mmu_probe(void);
 
 /* *
  * print_kerninfo - print the information about kernel, including the location
@@ -38,6 +40,10 @@ int kern_init(void) {
 
     // grade_backtrace();
     pmm_init();  // init physical memory management
+
+    mmu_probe();
+    slub_init();
+    slub_check();
 
     /* do nothing */
     while (1)
