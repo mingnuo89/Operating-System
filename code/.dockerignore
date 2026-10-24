@@ -1,0 +1,20 @@
+.git
+.gitignore
+.DS_Store
+**/.DS_Store
+
+# Local editor and operating-system metadata
+.idea
+.vscode
+*.swp
+
+# Common course build outputs
+build
+out
+dist
+*.a
+*.bin
+*.elf
+*.img
+*.log
+*.o

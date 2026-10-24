@@ -1,0 +1,18 @@
+name: os-course-riscv
+
+services:
+  os-dev:
+    image: os-course-riscv-dev:ubuntu24.04
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: student
+    working_dir: /workspace
+    volumes:
+      - type: bind
+        source: .
+        target: /workspace
+    init: true
+    stdin_open: true
+    tty: true
+    command: ["sleep", "infinity"]

@@ -1,0 +1,7 @@
+{
+  "kern/mm/best_fit_pmm.c": "6e8d2567b7603c3842eda7508fc22f743792037704a9c4ee5e4aa1a06db979ff",
+  "tools/test_lab2.c": "6feb75f20361d95436856e525af80bef0c55b300391cda3a6deaeda53a0f118d",
+  "tools/test_lab2.h": "9caead317ad13c5cdd143abbc3f250c9b8f284125c4ba17a1e4f479b8d9f444c",
+  "tools/inject.py": "d5ffc8179275979f702dcaa29779bc5cddf5a82b5ca0435d9a4732c5447d0f35",
+  "tools/grade.sh": "9f4b6a6277daa092b70706a67a656dc3978acb0eb8139352a3a7b21ec9f522b1"
+}

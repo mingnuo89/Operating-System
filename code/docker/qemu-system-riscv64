@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+readonly REAL_QEMU="/usr/bin/qemu-system-riscv64"
+
+has_kernel=false
+kernel_image=""
+args=("$@")
+
+for ((index = 0; index < ${#args[@]}; index++)); do
+    case "${args[index]}" in
+        -kernel)
+            has_kernel=true
+            ;;
+        -device)
+            if ((index + 1 < ${#args[@]})); then
+                device="${args[index + 1]}"
+                if [[ "$device" == loader,file=*,addr=0x80200000* ]]; then
+                    kernel_image="${device#loader,file=}"
+                    kernel_image="${kernel_image%%,*}"
+                fi
+            fi
+            ;;
+    esac
+done
+
+# The course Makefile uses the QEMU 4.1-era generic loader syntax.  Modern QEMU
+# also needs -kernel so its bundled OpenSBI receives the S-mode entry address.
+if [[ "$has_kernel" == false && -n "$kernel_image" ]]; then
+    exec "$REAL_QEMU" -kernel "$kernel_image" "$@"
+fi
+
+exec "$REAL_QEMU" "$@"
