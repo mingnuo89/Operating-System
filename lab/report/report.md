@@ -17,7 +17,7 @@
 | 组员 B：2410849－张祖浩 | Best-Fit、SLUB；GDB 3、4 |
 | 组员 C | Buddy System；GDB 5、6，并协助要求 1 |
 
-这份文档是我的个人部分，供合并到小组报告。为了能单独运行和验证，当前副本也补齐了初始化和 Buddy；它们的正式报告仍由对应成员负责。下面的四份提示词由 AI 协助，按指导书格式和现有接口补充整理，用于复核需求和复现实验，不是最初开发对话的逐字记录。代码实现和运行验证完成于 10 月 22 日，提示词整理于 10 月 24 日。独立版本见 [prompt.md](prompt.md)。
+这份文档是我的个人部分，供合并到小组报告。为了能单独运行和验证，当前副本也补齐了初始化和 Buddy；它们的正式报告仍由对应成员负责。下面的四份提示词由 AI 协助，按指导书格式和现有接口补充整理，用于复核需求和复现实验，不是最初开发对话的逐字记录。代码实现和运行验证完成于 10 月 22 日，提示词整理于 10 月 24 日。独立版本见 [prompt.md](prompt.md)。下文提示词中的源码路径均以 `lab/code/` 为工程目录。
 
 ## 一、实验目的
 
@@ -73,7 +73,7 @@ entry.S 建立启动页表并开启分页
 
 #### 模块功能描述
 
-主要函数位于 [best_fit_pmm.c](kern/mm/best_fit_pmm.c)：
+主要函数位于 [best_fit_pmm.c](../code/kern/mm/best_fit_pmm.c)：
 
 ```c
 static void best_fit_init(void);
@@ -193,7 +193,7 @@ Best-Fit 也可能留下很多很小的剩余块。它只保证本次选中的�
 
 #### 模块功能描述
 
-实现位于 [slub.c](kern/mm/slub.c)，测试单独放在 [slub_check.c](kern/mm/slub_check.c)。接口为：
+实现位于 [slub.c](../code/kern/mm/slub.c)，测试单独放在 [slub_check.c](../code/kern/mm/slub_check.c)。接口为：
 
 ```c
 void slub_init(void);
@@ -357,7 +357,7 @@ slub_check() succeeded!
 
 在内核里加了 `mmu_probe()`，对同一个数据地址执行三次 `ld`。第一次之前执行 `sfence.vma`，第二次直接读取，第三次之前再次执行 `sfence.vma`。三次结果都必须为 `0x1122334455667788`。这样可以观察缓存填充和复用，而不必从大量随机访存中寻找目标。
 
-自动脚本 [trace_mmu.py](tools/trace_mmu.py) 启动两个真实 GDB 会话：宿主 GDB 调试 QEMU，多架构 GDB 连接内核。内核在 `slub_init()` 停下时，三次读取已经完成。宿主断点只关心目标地址，记录到 `evidence/gdb-host-tlb.log`。
+自动脚本 [trace_mmu.py](../code/tools/trace_mmu.py) 启动两个真实 GDB 会话：宿主 GDB 调试 QEMU，多架构 GDB 连接内核。内核在 `slub_init()` 停下时，三次读取已经完成。宿主断点只关心目标地址，记录到 `evidence/gdb-host-tlb.log`。
 
 #### 提示词设计
 
