@@ -1,24 +1,25 @@
-# Project Structure
+# 项目目录
 
-## Lab2 merged workspace
+## 实验代码
 
-- `code/`: merged runnable Lab2 kernel. Member A's physical-memory initialization and First-Fit, member B's Best-Fit/SLUB/GDB 3/4 probe, and member C's Buddy manager are integrated here.
-- `lab/code/`: member B's standalone submission snapshot; retained as merge source and evidence.
-- `lab/report/`: member B's report and screenshots.
-- `report/report_lab2.md`: group Lab2 report with member C's Buddy and GDB 5/6 sections.
-- `report/prompt_c.md`: member C's required implementation and test prompts.
-- `report/evidence/member_c/`: reproducible output excerpts for Buddy and GDB 5/6.
-- `report/images/member-c/`: English-named copies of member C's eight original screenshots, referenced by the merged report.
-- `lab/report/images/`: member B's thirteen screenshots; all are referenced from the merged group report without duplicating the binary files.
+`code/` 是唯一的 Lab2 编译入口，整合了 A 的物理内存初始化与 First-Fit、B 的 Best-Fit/SLUB/GDB 3/4 探针，以及 C 的 Buddy。
 
-## Build and run
+- `kern/`、`libs/`：内核和基础库。
+- `tools/`：编译、评分、自动运行、完整性核对和双 GDB 工具。
+- `Dockerfile`、`compose.yaml`、`docker/`：容器环境，当前 code 目录映射到 `/workspace`。
+- `evidence/official-test-hashes.json`：从官方框架提取的原始测试哈希。运行日志和 GDB 脚本在执行时生成，不随目录整理新增上传。
 
-Run commands from `code/` in WSL. The default physical-page manager is Best-Fit. Define `PMM_FIRST_FIT` through `EXTRA_CFLAGS` to select First-Fit.
+默认使用 Best-Fit。切换前先清理，再通过 `EXTRA_CFLAGS=-DPMM_FIRST_FIT` 或 `EXTRA_CFLAGS=-DPMM_BUDDY` 编译。
 
-- `make`: cross-compile the RISC-V kernel and raw image.
-- `make qemu`: boot the image through OpenSBI; `-kernel` communicates the 0x80200000 next-stage entry to current QEMU versions.
-- `make clean && make EXTRA_CFLAGS=-DPMM_FIRST_FIT`: build the merged kernel with member A's First-Fit manager.
-- `make clean && make EXTRA_CFLAGS=-DPMM_BUDDY`: build the merged kernel with member C's Buddy manager.
+## 实验材料
 
-The merged startup sequence is `kern_entry -> kern_init -> pmm_init -> mmu_probe -> slub_init -> slub_check`.
+- [report/report_lab2.md](report/report_lab2.md)：A、B、C 的完整小组报告。
+- [report/prompt_b.md](report/prompt_b.md)：B 的四份完整提示词，总报告中保留相同正文。
+- [report/prompt_c.md](report/prompt_c.md)：C 的 Buddy 实现与测试提示词。
+- [report/images/member-b/README.md](report/images/member-b/README.md)：B 的 13 张原始截图及采集方式。
+- `report/images/member-c/`、`report/images/pic*.png`：C 和 A 的截图，保留既有文件名。
+- `report/evidence/member_c/`：C 已提交的验证记录。
 
+旧的 B 独立副本已从当前目录移除，原版本可从 Git 历史查看。历史截图仍按各自采集时的版本与环境解释。
+
+启动流程为 `kern_entry → kern_init → pmm_init → mmu_probe → slub_init → slub_check`。

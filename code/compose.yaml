@@ -1,4 +1,4 @@
-name: os-course-riscv
+name: os-lab2
 
 services:
   os-dev:

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-25
+
+- Consolidated the project into root `code/` and `report/`; removed the obsolete `lab/` snapshot.
+- Moved the Docker environment and four verification/debugging tools into the integrated code directory.
+- Moved all thirteen member B screenshots and their provenance index to `report/images/member-b/`, updating every report reference.
+- Preserved all four complete member B prompts in `report/prompt_b.md` and in the group report.
+- Retained the existing integrated-code annotations and restored member B student-ID comments without changing executable logic.
+- Kept the original test hash baseline; the integrity checker recognizes only the exact existing QEMU loader-line adjustment in the grader.
+- Kept the historical snapshot descriptions below as records of the earlier layout.
+
 ## 2026-10-24
 
 - Started the member A + member B Lab2 merge into `code/`.

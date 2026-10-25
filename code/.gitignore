@@ -1,0 +1,10 @@
+obj/
+bin/
+.debug/
+.qemu.out
+.gdb.in
+
+# Generated verification and debugger output
+evidence/*.log
+evidence/*.gdb
+__pycache__/

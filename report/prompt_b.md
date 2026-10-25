@@ -2,9 +2,9 @@
 
 整理日期：2026-10-24。对应组员 B 的 Best-Fit、SLUB 和 GDB 调试要求 3、4。
 
-提示词中的源码与工具路径均以 `lab/code/` 为工程目录；执行时先进入该目录。
+提示词中的源码与工具路径均以 `code/` 为工程目录；执行时先进入该目录。
 
-格式依据：[指导书“提示词结构”](http://oslab.mobisys.top/lab2026/_book/lab0.5/3_prompt_structure.html)。同一份正文已放入 [个人报告](report.md) 的对应位置。
+格式依据：[指导书“提示词结构”](http://oslab.mobisys.top/lab2026/_book/lab0.5/3_prompt_structure.html)。同一份正文已放入 [小组实验报告](report_lab2.md) 的对应位置。
 
 ## P-BF：Best-Fit 实现
 

@@ -6,7 +6,7 @@ AI 工具：Codex
 
 ## 提示词一：实现并接入 Buddy System
 
-```markdown
+````markdown
 [PROMPT]
 **任务**：在 Lab2 的 `kern/mm/` 中从零实现 Buddy System 物理页分配模块，并通过现有 `struct pmm_manager` 接入内核。Buddy 以 2 的幂页数管理空闲块；非 2 的幂请求向上取整。新增代码不能替换已有 First-Fit、Best-Fit、物理内存探测或测试代码。
 
@@ -78,11 +78,11 @@ static size_t buddy_nr_free_pages(void);
 
 ## 管理器接入
 **Post-Condition**：定义完整的 `buddy_pmm_manager`；`PMM_BUDDY` 配置选择 Buddy，First-Fit 与默认 Best-Fit 仍可构建运行。
-```
+````
 
 ## 提示词二：设计并运行 Buddy 测试
 
-```markdown
+````markdown
 [PROMPT]
 **任务**：为刚实现的 Buddy System 设计 `buddy_check()`，通过 `buddy_pmm_manager.check` 在内核启动时执行。测试必须验证算法行为，不能只检查一次申请成功。
 
@@ -122,4 +122,4 @@ static void buddy_check(void);
 **Case 4：失败边界。** 请求超过当前总空闲页数，必须返回 `NULL`，空闲页数不变。
 
 **Requirements**：Buddy 自检后继续运行 SLUB 的尺寸、复用、整页回收、耗尽恢复测试；64/128/256 MiB 三种配置均不得出现 panic 或 assertion failure。
-```
+````

@@ -1,18 +1,18 @@
 # Lab2 代码与运行
 
-本目录是 Lab2 的工程根目录，包含 `Makefile`、`kern/`、`libs/`、`tools/` 及 Docker 环境。报告和提示词位于同级的 [report 目录](../report/report.md)，截图见 [索引](../report/images/README.md)。
+本目录是 Lab2 的工程根目录，包含 `Makefile`、`kern/`、`libs/`、`tools/` 及 Docker 环境。报告和提示词位于同级的 [report 目录](../report/report_lab2.md)，截图见 [索引](../report/images/member-b/README.md)。
 
 ## 编译与验证
 
 从仓库根目录执行：
 
 ```bash
-cd lab/code
+cd code
 docker compose up -d --build
 docker compose exec os-dev bash
 ```
 
-容器把当前 `code/` 目录挂载为 `/workspace`，进入容器后直接运行：
+Compose 项目名为 `os-lab2`，容器把当前 `code/` 目录挂载为 `/workspace`。进入容器后直接运行：
 
 ```bash
 cd /workspace
@@ -28,7 +28,7 @@ make grade
 python3 tools/check_integrity.py
 ```
 
-官方评分只覆盖初始化和 Best-Fit，原实测结果为 20/20；SLUB、Buddy 和 GDB 另行验证。完整性脚本读取 `evidence/official-test-hashes.json`，该文件是测试元数据。运行时产生的日志也保存在 `evidence/`，历史原始日志未公开上传。
+官方评分只覆盖初始化和 Best-Fit，SLUB、Buddy 和 GDB 另行验证。完整性脚本读取原始 `evidence/official-test-hashes.json`，严格核对受保护测试。对于已有的 `grade.sh` 加载参数修改，只允许把那一行还原后与原始哈希一致的版本，其他变化仍会失败。运行日志保存在 `evidence/`，历史原始日志未随本次整理新增上传。
 
 ## 切换底层分配器
 
@@ -58,4 +58,4 @@ python3 tools/trace_mmu.py
 
 调试版单独构建在 `/tmp/lab2-qemu/qemu-4.1.1`，不替换系统 QEMU。脚本启动宿主和客体两个 GDB，stub 只监听回环地址 1235 端口，生成 TLB 查询、PTE、填充及 Bare 模式的日志。
 
-本次目录整理保留内核、原始测试和调试脚本的文件内容，仅更改存放路径与文档链接。构建产物、调试缓存及历史运行日志不纳入提交。
+本次整理保留整合版的执行逻辑和现有中文注释，补回 B 的学号注释；原始测试与注入器未改。构建产物、调试缓存及新生成的运行日志不纳入提交。

@@ -18,3 +18,9 @@ dist
 *.img
 *.log
 *.o
+
+# Rebuild locally rather than copying generated artifacts or QEMU caches
+bin
+obj
+.debug
+__pycache__
