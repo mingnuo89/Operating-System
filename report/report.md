@@ -16,7 +16,7 @@
 |------|----------------|
 | 2410878-吕明诺 | 功能模块一：Trap 上下文恢复与 Trap 入口（练习一，`RESTORE_ALL` / `__alltraps`） |
 | 2410849-张祖浩 | 功能模块二：异常处理与返回地址调整（`exception_handler()`）、异常单元测试与整合测试记录 |
-| 2410625-吴宇轩 | 功能模块三：中断处理与时钟中断（`interrupt_handler()`）【由本人补充】 |
+| 2410625-吴宇轩 | 功能模块三：中断处理与时钟中断（`interrupt_handler()`） |
 
 实验报告如何分工？
 
@@ -129,7 +129,7 @@ __alltraps:
 
 （3）**`__alltraps` 要做什么。** 它是 `stvec` 指向的唯一入口（Direct 模式，所有中断与异常都跳到这里）。它做三件事：`SAVE_ALL` 保存现场；把此时 sp 指向的地址作为 `struct trapframe *` 按 RISC-V 调用约定放进 `a0`，调用 `trap()`；`trap()` 返回后落到 `__trapret`，执行 `RESTORE_ALL` 与 `sret`。`jal trap` 会覆盖 `ra`，但 `ra` 已经在 `SAVE_ALL` 里存进 1 号槽，`RESTORE_ALL` 会把它恢复回来，所以不冲突。
 
-（4）**与其它模块的交互。** 向下依赖硬件写好的 `sepc/scause/sbadaddr` 与 `sstatus` 的 `SPP/SPIE` 语义；向上供 `kern/trap/trap.c` 中的 `trap()` 使用——`trap()` 只做分发，它可能修改 `tf->epc`（异常处理后要跳过出错指令），所以 `sepc` 的写回必须发生在 `trap()` **返回之后**，否则修改会丢。
+（4）**与其它模块的交互。** 向下依赖硬件写好的 `sepc/scause/stval` 与 `sstatus` 的 `SPP/SPIE` 语义；向上供 `kern/trap/trap.c` 中的 `trap()` 使用——`trap()` 只做分发，它可能修改 `tf->epc`（异常处理后要跳过出错指令），所以 `sepc` 的写回必须发生在 `trap()` **返回之后**，否则修改会丢。
 
 （5）**一个必须说清的语义前提。** 本实验 `SAVE_ALL` 第一句就执行 `csrw sscratch, sp`，把陷入前的 sp 写进 `sscratch`，随后 `csrrw s0, sscratch, x0` 把它取出来存到 2 号槽并把 `sscratch` 清 0。因此 **2 号槽里存的是陷入前的 sp，不是 0**。这一点决定了 `x2` 有两种等价恢复方式。
 
@@ -166,7 +166,7 @@ __alltraps:
 
 `SAVE_ALL` 已经实现了上下文保存功能，会在当前栈上分配 36 个寄存器大小的空间，并按照固定顺序保存 32 个通用寄存器和 4 个 CSR 的值。
 
-其中，原来的 `sp` 会先通过 `sscratch` 临时保存，再写入 TrapFrame 的第 2 个位置。`sstatus`、`sepc`、`sb adaddr`（实际代码名称为 `sbadaddr`）和 `scause` 分别保存在第 32～35 个位置。
+其中，原来的 `sp` 会先通过 `sscratch` 临时保存，再写入 TrapFrame 的第 2 个位置。`sstatus`、`sepc`、`stval`和 `scause` 分别保存在第 32～35 个位置。
 
 **2. TrapFrame 数据结构**
 
@@ -445,25 +445,42 @@ tf->epc 指向内核可以读取的指令地址。
 
 ---
 
-### 功能模块三：中断处理与时钟中断
+### 功能模块三：中断处理与时钟中断（组员 B）
 
 **负责人：** 2410625-吴宇轩
 
-**【待本人补充】**
+#### 模块功能描述
 
-按实验要求，该模块需实现 `kern/trap/trap.c` 中的：
+本模块承接练习一保存好的 TrapFrame。处理器把事件原因写入 `scause`，汇编入口将它保存在 `tf->cause`。`trap_dispatch()` 用最高位区分异步中断和同步异常。进入 `interrupt_handler()` 后，仅屏蔽最高位，保留原因编号，再通过 `switch` 分类。时钟中断走调度下一次事件、累计 tick、周期输出、达到次数后关机的路径。其他已定义类型输出诊断提示。未知编号输出原因并调用 `print_trapframe(tf)`。中断分支不修改 `tf->epc`，返回时由练习一的恢复代码及 `sret` 继续原执行流。
+
+#### 关键代码与分支分析
 
 ```c
-void interrupt_handler(struct trapframe *tf);
+const uintptr_t interrupt_bit = (uintptr_t)1 << (sizeof(uintptr_t) * 8 - 1);
+const uintptr_t cause = tf->cause & ~interrupt_bit;
+/* switch (cause) 中的时钟分支 */
+case IRQ_S_TIMER:
+    clock_set_next_event();
+    if (++ticks % TICK_NUM == 0) {
+        print_ticks();
+        if (++reports == SHUTDOWN_AFTER) {
+            sbi_shutdown();
+        }
+    }
+    break;
 ```
 
-功能要点（依据实验指导书，供补齐时对照）：
+`clock_init()` 启用监督级时钟中断，调用 `clock_set_next_event()` 安排首次事件，并把 `ticks` 归零。后者读取 `rdtime`，以当前时间加 `timebase` 计算下一次绝对截止时间，再交给 SBI。该接口设置的是一次性事件，因此处理每次 IRQ 都要重设。按 QEMU 约 10 MHz 时间基准和当前 100000 的增量，名义间隔约 10 ms。处理时间和虚拟机调度会影响实际间隔。
 
-1. 处理 `IRQ_S_TIMER`：每次时钟中断调用 `clock_set_next_event()` 设置下一次时钟事件（否则只能收到一次时钟中断），`ticks` 每次加一，达到 `TICK_NUM` 整数倍时输出规定格式的统计信息，累计输出达到 `SHUTDOWN_AFTER` 后调用框架提供的关机接口。
-2. 其他可识别的中断类型（如 `IRQ_S_SOFT`）做基本类型区分和提示输出。
-3. 无法识别的中断调用 `print_trapframe(tf)` 输出完整 Trap frame 以辅助调试。
+`ticks` 表示累计处理的时钟中断数，每次只增加一次。`reports` 是函数内部静态变量，仅在打印后增加。每累计 100 次调用已有 `print_ticks()` 输出 `100 ticks`，普通运行第 10 次输出后请求 SBI 关机，也就是累计第 1000 次。现有 `DEBUG_GRADE` 条件下 `print_ticks()` 自带提前结束逻辑。其余识别分支只用于分类诊断，没有实现设备中断控制器应答。
 
-> 说明：该模块未实现时，内核无法完成链接（`trap.c` 会报 `implicit declaration of function 'interrupt_handler'`），因此功能模块一的运行验证是在临时副本中用最小中断桩完成的，桩代码不入库。
+#### 最终提示词
+
+完整提示词与规格见 [prompt_b.md](./prompt_b.md)。沿用组员 A 的 [PROMPT]、[RELY]、[GUARANTEE]、[SPECIFICATION] 四段，先限定允许修改的代码，再列出依赖、计数边界和验收输出。测试时将原因值最高位、S 态软件中断、未知原因和 200 tick 后的返回分开观察，以免单次打印掩盖重设错误。
+
+#### 实现和调试过程
+
+合并前的框架在 `trap_dispatch()` 调用 `interrupt_handler()`，但缺少对应定义。补上函数并保留 A、C 的实现后，交叉编译日志已出现 `+ cc kern/trap/trap.c`，并继续到物理内存模块。首次整体验证发现 Lab 2 依赖存在空位，编译在 `best_fit_pmm.c` 报 `free_list` 和 `nr_free` 未声明。该问题发生在前置代码，不能据此给时钟处理评分。分支审阅时重点检查了三种潜在错误：直接使用带最高位的原因值做匹配、只设置首次时钟事件、将 100 次中断误写成关机阈值。当前实现分别通过最高位掩码、每次重设和独立输出计数处理。此处只记录可复现的故障与审阅风险，不把风险写成已发生的 AI 生成事故。
 
 ---
 
@@ -527,23 +544,34 @@ exception_handler: 16-bit, 32-bit, and fallback cases passed
 
 `file` 将产物识别为 64 位 RISC-V 可重定位 ELF 文件，`nm` 显示其中包含 `exception_handler` 符号。交叉编译确认了该源文件能够生成目标架构的目标文件；链接成完整内核及实际 Trap 返回还需要结合其余模块进行验证。
 
-### 5.3 整合验证现状
+### 5.3 三个模块整合验证
 
-| 验证层次 | 覆盖范围 | 现状 |
+本次在 WSL Ubuntu 24.04 上使用 RISC-V 交叉编译器与 QEMU virt 运行完整内核。仓库评分脚本在临时副本注入用例，保留提交源码。结果来自同一份合并代码。
+
+| 检查 | 覆盖范围 | 结果 |
 |---|---|---|
-| 宿主单元测试（模块二） | `exception_handler` 在构造 Trap frame 下的分支与地址推进 | ✅ 通过（逻辑检查） |
-| 单文件交叉编译（模块二） | `trap.c` 能在 RISC-V 目标下生成含 `exception_handler` 的目标文件 | ✅ 通过 |
-| 真实内核运行（模块一） | Trap 入口、上下文恢复、`sret` 返回 | ✅ `PASS (35/35)`，但使用临时中断桩 |
-| 完整 `make grade` | Test 1 + Test 2 + Test 3（35 + 25 + 40） | ⏳ 待模块三（`interrupt_handler`）补齐后统一执行 |
+| Test 1 | Trap 入口、寄存器恢复和断点返回 | PASS (35/35) |
+| Test 2 | 非法指令返回、S 态软件中断和未知原因诊断 | PASS (25/25) |
+| Test 3 | S 态时钟持续重设与多次 Trap 返回，检查 ticks=200 | PASS (40/40) |
+| 普通 make qemu | 初始化、时钟输出计数和 SBI 关机 | 输出 10 行 100 ticks，进程退出码 0 |
 
-**尚未完成的环节与原因：**
+合计 **100/100**。原始结果见 [评分日志](./grade-lab3.log) 与 [普通启动串口日志](./qemu-lab3.log)。5.1、5.2 保留组员各自早期验证的条件和记录。
 
-- 模块三（`interrupt_handler` 与时钟中断）未实现时，整棵内核无法链接，因此 `make grade` 的三个用例无法在同一份代码上一起跑；
-- 模块一的 Test 1 是在临时副本中加入最小中断桩后跑出来的，验证的是“入口 + 恢复 + 返回”这一条链，桩不入库；
-- 模块二目前的证据是宿主逻辑测试与单文件交叉编译，**不能**据此声称“真实 Trap 返回已验证”。
+![整合评分，末尾显示 100/100](./images/13-lab3-grade.png)
 
-**测试截图：** 【待补】`./images/` 下需包含：模块一的 `make grade` Test 1 PASS 与 `make qemu` 运行输出；模块二的 oslab 环境与单元测试、异常处理代码、Trap frame 与分发、测试用例与结果、RISC-V 交叉编译。
+图 13　整合评分结果。截图包含 Test 2、Test 3 和总分，Test 1 的完整结果见评分日志。
 
+![时钟中断输出十次后关机，QEMU 退出码为 0](./images/14-lab3-timer-shutdown.png)
+
+图 14　普通启动完成时钟初始化，输出十行 100 ticks 后正常关机。
+
+#### 整合中发现的问题与处理
+
+工具链兼容性检查中，汇编器对旧 CSR 名称 sbadaddr 报 unknown CSR。SAVE_ALL 和 RESTORE_ALL 改用标准名称 stval，读写仍对应 TrapFrame 第 34 槽。
+
+1. **前置代码空位。** 首次编译在 Best-Fit 检查处缺少空闲链表和计数定义，物理内存初始化也有 Lab 2 空位。从同仓库 lab2 分支的 8fcd03f 补入原有分配器和 page_init，只接回缺少的模块。移植时发现旧的 PHYSICAL_MEMORY_END 在当前头文件未定义，改用 KERNTOP 减去现有虚实地址偏移计算相同的物理上界。
+2. **固件入口与页表切换。** 初次整核链接成功后，串口仅有 OpenSBI 日志，Next Address 为 0。将 QEMU 的镜像参数改为 -kernel 后，固件的下一入口为 0x80200000，但仍未到 C 初始化。检查 entry.S 后发现写入 satp 的瞬间，下一条指令仍从低地址取指，原表仅映射高半区。增加启动阶段的低地址恒等映射，保留高半区映射，随后正常进入内核并完成评分。
+3. **区分周期与终止。** 评分用例验证到 200 tick，可覆盖第二次周期输出。另以普通启动验证 1000 tick 和关机边界。两种运行分别保留日志，避免把评分脚本超时当作正常关机。
 
 ## 六、实验总结与收获
 

@@ -44,7 +44,7 @@
     csrrw s0, sscratch, x0
     csrr s1, sstatus
     csrr s2, sepc
-    csrr s3, sbadaddr
+    csrr s3, stval
     csrr s4, scause
 
     STORE s0, 2*REGBYTES(sp)
@@ -61,12 +61,12 @@
     # 先用 s1~s4 读出来写回 CSR，再把 s1~s4 当普通寄存器恢复。
     LOAD s1, 32*REGBYTES(sp)        # sstatus
     LOAD s2, 33*REGBYTES(sp)        # sepc
-    LOAD s3, 34*REGBYTES(sp)        # sbadaddr
+    LOAD s3, 34*REGBYTES(sp)        # stval
     LOAD s4, 35*REGBYTES(sp)        # scause
 
     csrw sstatus, s1
     csrw sepc, s2
-    csrw sbadaddr, s3
+    csrw stval, s3
     csrw scause, s4
 
     # 按 SAVE_ALL 的顺序恢复通用寄存器（x0 恒为 0，不用恢复）
