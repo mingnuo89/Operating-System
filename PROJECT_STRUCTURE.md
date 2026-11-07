@@ -9,7 +9,7 @@
 | code/kern/mm/best_fit_pmm.c | 从同仓库 Lab 2 补入的 Best-Fit 实现及 Lab 3 框架检查 |
 | code/tools/ | 课程测试注入与评分脚本 |
 | report/report.md | 三人合并实验报告 |
-| report/prompt_a.md、report/prompt_b.md | A、B 的规格与最终提示词，C 的规格在合并报告正文 |
+| report/report.md 文末附录 | 三位组员的最终 Prompt、Spec 与验收要求 |
 | report/images/ | 原有测试截图 |
 | report/grade-lab3.log、report/qemu-lab3.log | 本次真实评分与普通启动串口记录 |
 

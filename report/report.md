@@ -137,140 +137,7 @@ __alltraps:
 
 #### 最终提示词
 
-以下是经过迭代后最终使用的提示词（迭代过程见下一节）：
-
-````markdown
-# 练习一：Trap 上下文恢复与 Trap 入口功能
-
-## [PROMPT]
-
-**任务：**
-
-修改 `kern/trap/trapentry.S` 文件，完成 Trap 上下文恢复与 Trap 入口功能，主要包括 `RESTORE_ALL` 和 `__alltraps` 两部分。
-
-当 CPU 发生中断或异常时，已有的 `SAVE_ALL` 会将寄存器状态保存到栈上的 TrapFrame 中。需要在此基础上实现上下文恢复，并建立汇编入口与 C 语言 `trap()` 函数之间的调用关系，使系统能够正确完成 Trap 的进入、处理和返回过程。
-
-**操作要求：**
-
-直接修改项目中的实际文件，在标有 `lab3 function1 YOUR CODE` 的位置补充代码。保留已有的 `SAVE_ALL`、`__trapret` 等代码，不要修改 TrapFrame 的结构或现有函数接口，也不要增加与本次练习无关的功能。
-
-**输出要求：**
-
-根据下面提供的已有接口和功能要求完成代码，尽量保持原有代码风格。完成后简要说明新增代码的作用，重点解释寄存器恢复、栈指针处理和 TrapFrame 参数传递的过程。
-
-## [RELY]
-
-本功能可以依赖以下已有代码、宏定义和数据结构：
-
-**1. SAVE_ALL 宏**
-
-`SAVE_ALL` 已经实现了上下文保存功能，会在当前栈上分配 36 个寄存器大小的空间，并按照固定顺序保存 32 个通用寄存器和 4 个 CSR 的值。
-
-其中，原来的 `sp` 会先通过 `sscratch` 临时保存，再写入 TrapFrame 的第 2 个位置。`sstatus`、`sepc`、`stval`和 `scause` 分别保存在第 32～35 个位置。
-
-**2. TrapFrame 数据结构**
-
-`kern/trap/trap.h` 中已经定义了 `struct trapframe`，其中包含保存通用寄存器的 `struct pushregs gpr`，以及 `status`、`epc`、`badvaddr`、`cause` 四个字段。
-
-这些字段的顺序与 `SAVE_ALL` 的保存布局一致，恢复上下文时需要遵循相同的布局。
-
-**3. 已有宏和接口**
-
-- `REGBYTES`：表示当前架构下一个寄存器占用的字节数。
-- `LOAD`、`STORE`：用于通用寄存器与内存之间的数据读取和保存。
-- `csrr`、`csrw`：用于读取和写入 CSR。
-- `trap(struct trapframe *tf)`：已有的 C 语言 Trap 处理接口。
-- `__trapret`：已有的 Trap 返回入口，负责执行上下文恢复和 `sret`。
-
-另外，可以依赖 RISC-V 的函数调用约定，其中第一个函数参数通过 `a0` 传递。
-
-## [GUARANTEE]
-
-必须在 `kern/trap/trapentry.S` 中完成以下两个功能：
-
-**1. RESTORE_ALL**
-
-实现与现有 `SAVE_ALL` 对应的汇编宏，负责从 TrapFrame 中恢复 CPU 的寄存器状态，使处理器能够恢复到 Trap 发生前的执行环境。
-
-**2. __alltraps**
-
-补全已有的 `__alltraps` 入口，使其能够在保存上下文后，正确调用 C 语言的 `trap(struct trapframe *tf)` 函数，并在处理完成后进入统一的 Trap 返回流程。
-
-两个功能需要相互配合，形成完整的 Trap 进入、上下文保存、C 语言处理、上下文恢复和返回流程。
-
-## [SPECIFICATION]
-
-### 1. RESTORE_ALL
-
-**Pre-Condition（前置条件）：**
-
-- CPU 已经通过 `SAVE_ALL` 将上下文保存到当前栈上的 TrapFrame 中。
-- 当前 `sp` 指向 TrapFrame 的起始地址。
-- TrapFrame 的布局与 `struct trapframe` 定义保持一致。
-- C 语言的 Trap 处理程序已经执行完成，准备恢复原来的执行状态。
-
-**Post-Condition（后置条件）：**
-
-- 原来保存的通用寄存器能够被正确恢复。
-- `sstatus` 和 `sepc` 等返回所需的处理器状态得到正确恢复。
-- 栈指针恢复到 Trap 发生前的位置。
-- 恢复过程不会破坏仍然需要读取的 TrapFrame 数据。
-- 完成恢复后，处理器能够继续执行 `sret`，返回正确的执行位置。
-
-**Case 1：普通寄存器恢复**
-
-对于已经保存在 TrapFrame 中的通用寄存器，需要根据 `SAVE_ALL` 的保存布局恢复原来的值。恢复完成后，寄存器内容应与 Trap 发生前保持一致，其中 `x0` 为恒零寄存器，不需要实际恢复。
-
-**Case 2：栈指针恢复**
-
-`sp` 在 Trap 处理过程中既用于定位 TrapFrame，又是需要恢复的寄存器，因此必须单独考虑。恢复时不能提前破坏当前栈指针，应该保证其他寄存器的数据读取完成后，栈指针能够正确回到 Trap 发生前的位置。
-
-**Case 3：CSR 状态恢复**
-
-需要恢复 Trap 返回所依赖的处理器状态，特别是 `sstatus` 和 `sepc`，保证中断使能状态、原特权级信息以及返回地址正确，使后续 `sret` 能够正常执行。
-
-**Requirements（其他要求）：**
-
-- 恢复布局必须与已有的 `SAVE_ALL` 完全对应。
-- 不允许修改 `SAVE_ALL` 和 `struct trapframe` 的定义。
-- 注意寄存器恢复的先后顺序，避免覆盖仍在使用的临时数据。
-- 不要在恢复完成后留下额外的栈空间占用。
-
-### 2. __alltraps
-
-**Pre-Condition（前置条件）：**
-
-- CPU 已经发生 Trap，并通过 `stvec` 跳转到 `__alltraps`。
-- 已有的 `SAVE_ALL` 可以将当前上下文保存为 TrapFrame。
-- C 语言中的 `trap(struct trapframe *tf)` 函数已经定义，可以直接调用。
-
-**Post-Condition（后置条件）：**
-
-- Trap 发生时的上下文能够完整保存到 TrapFrame。
-- C 语言的 `trap()` 函数能够接收到正确的 TrapFrame 指针。
-- `trap()` 可以读取和处理当前的中断或异常信息。
-- `trap()` 返回后，程序能够继续进入 `__trapret`，执行上下文恢复并通过 `sret` 返回。
-- 整个过程不会丢失原来的寄存器状态。
-
-**Case 1：Trap 入口处理**
-
-当 CPU 进入 `__alltraps` 时，需要利用已有的 `SAVE_ALL` 保存当前上下文，并保证保存后的 TrapFrame 能够被后续处理函数访问。
-
-**Case 2：调用 C 语言处理函数**
-
-上下文保存完成后，需要按照 RISC-V 函数调用约定，将当前 TrapFrame 的地址作为参数传递给 `trap()`。调用过程中即使使用了参数寄存器或返回地址寄存器，也不能影响原来保存的执行状态。
-
-**Case 3：Trap 处理完成后返回**
-
-当 `trap()` 处理完成并返回时，程序需要进入已有的 `__trapret`，通过 `RESTORE_ALL` 恢复上下文，最后执行 `sret` 返回原来的执行流。
-
-**Requirements（其他要求）：**
-
-- 保持 `__alltraps` 和 `__trapret` 原有的入口结构。
-- 遵守 RISC-V 函数调用约定，正确传递 TrapFrame 指针。
-- 调用 `trap()` 前后应保证栈指针与 TrapFrame 的关系正确。
-- 不修改 `trap()` 的函数签名，也不额外增加不必要的处理流程。
-````
+见文末附录中的组员 A 章节。
 
 #### 实现迭代过程
 
@@ -383,59 +250,7 @@ tf->epc += (instruction & 3) == 3 ? 4 : 2;
 
 #### 最终提示词
 
-根据实验要求和现有代码，将异常处理的目标、依赖接口和边界条件整理为以下提示词，供实现和复核使用：
-
-````text
-[PROMPT]
-我负责 Lab 3 的异常处理部分。请先阅读课程提供的 RISC-V ucore 代码框架，
-再在 kern/trap/trap.c 中实现 exception_handler(struct trapframe *tf)。
-函数需要识别非法指令异常和断点异常，输出异常信息，调整返回地址，
-使 Trap 返回后继续执行后续指令。请说明代码中每个分支和返回地址调整的原因。
-
-[RELY]
-1. kern/trap/trap.h 中的 struct trapframe 保存了本次 Trap 的上下文：
-   tf->cause 表示异常原因，tf->epc 保存异常发生时的指令地址。
-2. kern/trap/trap.c 中的 trap_dispatch() 已经区分中断和异常；
-   exception_handler() 接收到的是需要处理的异常。
-3. libs/riscv.h 已定义 CAUSE_ILLEGAL_INSTRUCTION、CAUSE_BREAKPOINT；
-   可使用 cprintf() 输出信息，使用 print_trapframe(tf) 输出完整现场。
-4. 本实验的测试指令位于内核可以读取的地址，考虑 16 位压缩指令和
-   32 位指令；Trap frame 的恢复和 sret 由统一返回流程完成。
-
-[GUARANTEE]
-保持现有函数接口：
-    void exception_handler(struct trapframe *tf);
-只实现异常处理所需的代码，保留已有函数、结构体和实验注释，
-不要更改 Trap frame 布局、trap_dispatch() 或其他成员负责的函数。
-
-[SPECIFICATION]
-前置条件：tf 指向当前有效的 Trap frame；对于需要跳过的实验指令，
-tf->epc 指向内核可以读取的指令地址。
-
-情况一：tf->cause 为 CAUSE_ILLEGAL_INSTRUCTION。
-输出以 Illegal instruction at 开头的信息及原异常地址，随后根据
-触发异常的指令长度更新 tf->epc，避免返回后再次执行同一条指令。
-
-情况二：tf->cause 为 CAUSE_BREAKPOINT。
-输出以 Breakpoint at 开头的信息及原异常地址，同样根据指令长度
-更新 tf->epc，使断点处理结束后可以继续执行。
-
-返回地址的计算：读取异常地址处的第一个 16 位半字，检查最低两位。
-在本实验的 16 位和 32 位指令范围内，最低两位不是二进制 11 时加 2
-字节，是 11 时加 4 字节。不能对两种指令都使用固定的地址增量。
-
-情况三：其他异常。
-调用 print_trapframe(tf) 输出异常现场，保持 tf->epc 不变，
-不尝试读取该地址处的指令，也不假设其他异常已经被恢复。
-
-后置条件：两类指定异常输出原地址并正确更新 frame 中的 epc；
-其他异常保留原 epc。不得直接改写与本任务无关的上下文。
-
-[验证要求]
-分别检查非法指令和断点在 16 位、32 位两种编码下的地址变化，
-验证输出前缀；再检查未知异常是否调用 print_trapframe() 且不修改 epc。
-使用课程提供的 RISC-V 交叉编译器检查代码，并记录实际执行的测试及结果。
-````
+见文末附录中的组员 C 章节。
 
 #### 实现和调试过程
 
@@ -476,7 +291,7 @@ case IRQ_S_TIMER:
 
 #### 最终提示词
 
-完整提示词与规格见 [prompt_b.md](./prompt_b.md)。沿用组员 A 的 [PROMPT]、[RELY]、[GUARANTEE]、[SPECIFICATION] 四段，先限定允许修改的代码，再列出依赖、计数边界和验收输出。测试时将原因值最高位、S 态软件中断、未知原因和 200 tick 后的返回分开观察，以免单次打印掩盖重设错误。
+见文末附录中的组员 B 章节。
 
 #### 实现和调试过程
 
@@ -623,3 +438,242 @@ exception_handler: 16-bit, 32-bit, and fallback cases passed
 
 ---
 
+## 附录：三位组员的 Prompt 与 Spec
+
+### 组员 A（吕明诺）：Trap 入口与上下文恢复
+
+````text
+# 练习一：Trap 上下文恢复与 Trap 入口功能
+
+## [PROMPT]
+
+**任务：**
+
+修改 `kern/trap/trapentry.S` 文件，完成 Trap 上下文恢复与 Trap 入口功能，主要包括 `RESTORE_ALL` 和 `__alltraps` 两部分。
+
+当 CPU 发生中断或异常时，已有的 `SAVE_ALL` 会将寄存器状态保存到栈上的 TrapFrame 中。需要在此基础上实现上下文恢复，并建立汇编入口与 C 语言 `trap()` 函数之间的调用关系，使系统能够正确完成 Trap 的进入、处理和返回过程。
+
+**操作要求：**
+
+直接修改项目中的实际文件，在标有 `lab3 function1 YOUR CODE` 的位置补充代码。保留已有的 `SAVE_ALL`、`__trapret` 等代码，不要修改 TrapFrame 的结构或现有函数接口，也不要增加与本次练习无关的功能。
+
+**输出要求：**
+
+根据下面提供的已有接口和功能要求完成代码，尽量保持原有代码风格。完成后简要说明新增代码的作用，重点解释寄存器恢复、栈指针处理和 TrapFrame 参数传递的过程。
+
+## [RELY]
+
+本功能可以依赖以下已有代码、宏定义和数据结构：
+
+**1. SAVE_ALL 宏**
+
+`SAVE_ALL` 已经实现了上下文保存功能，会在当前栈上分配 36 个寄存器大小的空间，并按照固定顺序保存 32 个通用寄存器和 4 个 CSR 的值。
+
+其中，原来的 `sp` 会先通过 `sscratch` 临时保存，再写入 TrapFrame 的第 2 个位置。`sstatus`、`sepc`、`stval`和 `scause` 分别保存在第 32～35 个位置。
+
+**2. TrapFrame 数据结构**
+
+`kern/trap/trap.h` 中已经定义了 `struct trapframe`，其中包含保存通用寄存器的 `struct pushregs gpr`，以及 `status`、`epc`、`badvaddr`、`cause` 四个字段。
+
+这些字段的顺序与 `SAVE_ALL` 的保存布局一致，恢复上下文时需要遵循相同的布局。
+
+**3. 已有宏和接口**
+
+- `REGBYTES`：表示当前架构下一个寄存器占用的字节数。
+- `LOAD`、`STORE`：用于通用寄存器与内存之间的数据读取和保存。
+- `csrr`、`csrw`：用于读取和写入 CSR。
+- `trap(struct trapframe *tf)`：已有的 C 语言 Trap 处理接口。
+- `__trapret`：已有的 Trap 返回入口，负责执行上下文恢复和 `sret`。
+
+另外，可以依赖 RISC-V 的函数调用约定，其中第一个函数参数通过 `a0` 传递。
+
+## [GUARANTEE]
+
+必须在 `kern/trap/trapentry.S` 中完成以下两个功能：
+
+**1. RESTORE_ALL**
+
+实现与现有 `SAVE_ALL` 对应的汇编宏，负责从 TrapFrame 中恢复 CPU 的寄存器状态，使处理器能够恢复到 Trap 发生前的执行环境。
+
+**2. __alltraps**
+
+补全已有的 `__alltraps` 入口，使其能够在保存上下文后，正确调用 C 语言的 `trap(struct trapframe *tf)` 函数，并在处理完成后进入统一的 Trap 返回流程。
+
+两个功能需要相互配合，形成完整的 Trap 进入、上下文保存、C 语言处理、上下文恢复和返回流程。
+
+## [SPECIFICATION]
+
+### 1. RESTORE_ALL
+
+**Pre-Condition（前置条件）：**
+
+- CPU 已经通过 `SAVE_ALL` 将上下文保存到当前栈上的 TrapFrame 中。
+- 当前 `sp` 指向 TrapFrame 的起始地址。
+- TrapFrame 的布局与 `struct trapframe` 定义保持一致。
+- C 语言的 Trap 处理程序已经执行完成，准备恢复原来的执行状态。
+
+**Post-Condition（后置条件）：**
+
+- 原来保存的通用寄存器能够被正确恢复。
+- `sstatus` 和 `sepc` 等返回所需的处理器状态得到正确恢复。
+- 栈指针恢复到 Trap 发生前的位置。
+- 恢复过程不会破坏仍然需要读取的 TrapFrame 数据。
+- 完成恢复后，处理器能够继续执行 `sret`，返回正确的执行位置。
+
+**Case 1：普通寄存器恢复**
+
+对于已经保存在 TrapFrame 中的通用寄存器，需要根据 `SAVE_ALL` 的保存布局恢复原来的值。恢复完成后，寄存器内容应与 Trap 发生前保持一致，其中 `x0` 为恒零寄存器，不需要实际恢复。
+
+**Case 2：栈指针恢复**
+
+`sp` 在 Trap 处理过程中既用于定位 TrapFrame，又是需要恢复的寄存器，因此必须单独考虑。恢复时不能提前破坏当前栈指针，应该保证其他寄存器的数据读取完成后，栈指针能够正确回到 Trap 发生前的位置。
+
+**Case 3：CSR 状态恢复**
+
+需要恢复 Trap 返回所依赖的处理器状态，特别是 `sstatus` 和 `sepc`，保证中断使能状态、原特权级信息以及返回地址正确，使后续 `sret` 能够正常执行。
+
+**Requirements（其他要求）：**
+
+- 恢复布局必须与已有的 `SAVE_ALL` 完全对应。
+- 不允许修改 `SAVE_ALL` 和 `struct trapframe` 的定义。
+- 注意寄存器恢复的先后顺序，避免覆盖仍在使用的临时数据。
+- 不要在恢复完成后留下额外的栈空间占用。
+
+### 2. __alltraps
+
+**Pre-Condition（前置条件）：**
+
+- CPU 已经发生 Trap，并通过 `stvec` 跳转到 `__alltraps`。
+- 已有的 `SAVE_ALL` 可以将当前上下文保存为 TrapFrame。
+- C 语言中的 `trap(struct trapframe *tf)` 函数已经定义，可以直接调用。
+
+**Post-Condition（后置条件）：**
+
+- Trap 发生时的上下文能够完整保存到 TrapFrame。
+- C 语言的 `trap()` 函数能够接收到正确的 TrapFrame 指针。
+- `trap()` 可以读取和处理当前的中断或异常信息。
+- `trap()` 返回后，程序能够继续进入 `__trapret`，执行上下文恢复并通过 `sret` 返回。
+- 整个过程不会丢失原来的寄存器状态。
+
+**Case 1：Trap 入口处理**
+
+当 CPU 进入 `__alltraps` 时，需要利用已有的 `SAVE_ALL` 保存当前上下文，并保证保存后的 TrapFrame 能够被后续处理函数访问。
+
+**Case 2：调用 C 语言处理函数**
+
+上下文保存完成后，需要按照 RISC-V 函数调用约定，将当前 TrapFrame 的地址作为参数传递给 `trap()`。调用过程中即使使用了参数寄存器或返回地址寄存器，也不能影响原来保存的执行状态。
+
+**Case 3：Trap 处理完成后返回**
+
+当 `trap()` 处理完成并返回时，程序需要进入已有的 `__trapret`，通过 `RESTORE_ALL` 恢复上下文，最后执行 `sret` 返回原来的执行流。
+
+**Requirements（其他要求）：**
+
+- 保持 `__alltraps` 和 `__trapret` 原有的入口结构。
+- 遵守 RISC-V 函数调用约定，正确传递 TrapFrame 指针。
+- 调用 `trap()` 前后应保证栈指针与 TrapFrame 的关系正确。
+- 不修改 `trap()` 的函数签名，也不额外增加不必要的处理流程。
+````
+
+### 组员 B（吴宇轩）：中断分发与时钟中断
+
+````text
+[PROMPT]
+我负责 Lab 3 的中断分发与监督级时钟中断。请先阅读 kern/trap/trap.c、
+kern/trap/trap.h、kern/driver/clock.c、libs/riscv.h、libs/sbi.h、
+tools/test_lab3.c 和 tools/grade.sh，再实现 interrupt_handler(struct trapframe *tf)。
+保留 lab3 function2 注释，将本人负责处的 YOUR CODE 替换为学号 2410625。
+说明时钟为何要重复设定、两种计数的区别，以及为何中断返回地址应保持原值。
+
+[RELY]
+1. Trap 入口已经把 scause 保存到 tf->cause。trap_dispatch() 根据最高位区分
+   中断和异常，评分代码也会直接调用 interrupt_handler() 测试诊断分支。
+2. clock_init() 安排首次定时事件并将 ticks 清零。clock_set_next_event()
+   读取 rdtime，按当前时间加 timebase 调用 SBI 设置下一次截止时间。
+3. 复用 IRQ_*、TICK_NUM、print_ticks()、print_trapframe(tf) 和
+   sbi_shutdown()。框架的 print_ticks() 在 DEBUG_GRADE 下可以提前结束。
+4. 本实验使用单 hart。Trap 入口保存的 sepc 由统一返回路径恢复并经 sret 返回。
+
+[GUARANTEE]
+保持原有函数签名和 TrapFrame 布局，保留 A 的入口与恢复和 C 的异常处理。
+只从局部原因值屏蔽最高位，保留原始 tf->cause 和 tf->epc。
+每个 S 态时钟中断只重设一次、计数一次。其他分支不更新计数、不重设时钟。
+输出字符串按评分脚本要求保留大小写，关机走框架 SBI 接口。
+
+[SPECIFICATION]
+前置条件：tf 指向有效的 TrapFrame。使用 uintptr_t 宽度确定中断标志位，
+屏蔽该位后按原因编号进入对应分支。编号 15 即使没有设置标志位也应走未知分支。
+
+情况一：IRQ_S_TIMER。先调用 clock_set_next_event()，然后递增 ticks。
+仅当 ticks 为 TICK_NUM（100）的整数倍时调用 print_ticks()，并增加独立的输出次数。
+普通运行在第 10 次输出完成后调用 sbi_shutdown()，对应第 1000 次时钟中断。
+第 100 次中断只输出一次，第 200 次中断输出第二次，均应能继续执行。
+保留 print_ticks() 已有的 DEBUG_GRADE 行为，不额外打印用于评分的测试标记。
+
+情况二：其他已识别的中断。按来源和类别输出诊断信息。
+IRQ_S_SOFT 必须输出 Supervisor software interrupt。此分支只提供诊断，
+不实现设备中断应答或调度策略。
+
+情况三：未知编号。先输出 Unknown interrupt: cause 加十进制编号，
+再调用 print_trapframe(tf) 打印原现场。禁止把编号 15 写成通用分支的固定值。
+
+[验证要求]
+在 code/ 下运行 make grade。记录三个用例的实际结果，重点核对 Test 2
+的软中断与未知原因输出，以及 Test 3 在持续重设后达到 ticks=200。
+再独立运行 make qemu，核对十行 100 ticks、虚拟机自行关机和退出码 0。
+报告区分交叉编译失败、固件启动失败、测试超时和正常关机，并保留真实日志。
+````
+
+### 组员 C（张祖浩）：异常处理与返回地址调整
+
+````text
+[PROMPT]
+我负责 Lab 3 的异常处理部分。请先阅读课程提供的 RISC-V ucore 代码框架，
+再在 kern/trap/trap.c 中实现 exception_handler(struct trapframe *tf)。
+函数需要识别非法指令异常和断点异常，输出异常信息，调整返回地址，
+使 Trap 返回后继续执行后续指令。请说明代码中每个分支和返回地址调整的原因。
+
+[RELY]
+1. kern/trap/trap.h 中的 struct trapframe 保存了本次 Trap 的上下文：
+   tf->cause 表示异常原因，tf->epc 保存异常发生时的指令地址。
+2. kern/trap/trap.c 中的 trap_dispatch() 已经区分中断和异常；
+   exception_handler() 接收到的是需要处理的异常。
+3. libs/riscv.h 已定义 CAUSE_ILLEGAL_INSTRUCTION、CAUSE_BREAKPOINT；
+   可使用 cprintf() 输出信息，使用 print_trapframe(tf) 输出完整现场。
+4. 本实验的测试指令位于内核可以读取的地址，考虑 16 位压缩指令和
+   32 位指令；Trap frame 的恢复和 sret 由统一返回流程完成。
+
+[GUARANTEE]
+保持现有函数接口：
+    void exception_handler(struct trapframe *tf);
+只实现异常处理所需的代码，保留已有函数、结构体和实验注释，
+不要更改 Trap frame 布局、trap_dispatch() 或其他成员负责的函数。
+
+[SPECIFICATION]
+前置条件：tf 指向当前有效的 Trap frame；对于需要跳过的实验指令，
+tf->epc 指向内核可以读取的指令地址。
+
+情况一：tf->cause 为 CAUSE_ILLEGAL_INSTRUCTION。
+输出以 Illegal instruction at 开头的信息及原异常地址，随后根据
+触发异常的指令长度更新 tf->epc，避免返回后再次执行同一条指令。
+
+情况二：tf->cause 为 CAUSE_BREAKPOINT。
+输出以 Breakpoint at 开头的信息及原异常地址，同样根据指令长度
+更新 tf->epc，使断点处理结束后可以继续执行。
+
+返回地址的计算：读取异常地址处的第一个 16 位半字，检查最低两位。
+在本实验的 16 位和 32 位指令范围内，最低两位不是二进制 11 时加 2
+字节，是 11 时加 4 字节。不能对两种指令都使用固定的地址增量。
+
+情况三：其他异常。
+调用 print_trapframe(tf) 输出异常现场，保持 tf->epc 不变，
+不尝试读取该地址处的指令，也不假设其他异常已经被恢复。
+
+后置条件：两类指定异常输出原地址并正确更新 frame 中的 epc；
+其他异常保留原 epc。不得直接改写与本任务无关的上下文。
+
+[验证要求]
+分别检查非法指令和断点在 16 位、32 位两种编码下的地址变化，
+验证输出前缀；再检查未知异常是否调用 print_trapframe() 且不修改 epc。
+使用课程提供的 RISC-V 交叉编译器检查代码，并记录实际执行的测试及结果。
+````
