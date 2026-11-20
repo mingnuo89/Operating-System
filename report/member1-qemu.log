@@ -1,0 +1,24 @@
+
+=== Lab 4: member 1 only (temporary boot entry) ===
+riscv64-unknown-elf-gcc (13.2.0-11ubuntu1+12) 13.2.0
+QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)
+(THU.CST) os is loading ...
+
+Special kernel symbols:
+  entry  0xc020004e (virtual)
+  etext  0xc02032e6 (virtual)
+  edata  0xc0208010 (virtual)
+  end    0xc0208480 (virtual)
+Kernel executable memory footprint: 34KB
+memory management: best_fit_pmm_manager
+physcial memory map:
+  memory: 0x0000000008000000, [0x0000000080000000, 0x0000000087ffffff].
+check_alloc_page() succeeded!
+check_pgdir() succeeded!
+check_boot_pgdir() succeeded!
+use SLOB allocator
+kmalloc_init() succeeded!
+[Member 1] remove without a page table: PASS
+[Member 1] first/second table allocation failure: PASS
+[Member 1] access after replacing a cached mapping: PASS
+[Test PMM] PASS

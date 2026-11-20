@@ -1,0 +1,2 @@
+[lab4 inject] ERROR: Function location is missing or ambiguous: proc_init
+make: *** [Makefile:212: grade] Error 1
