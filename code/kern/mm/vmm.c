@@ -65,6 +65,9 @@ static void check_pgfault(void);
 /*
  * 中文导读：mm_create
  * 分配一个地址空间管理对象，初始化 VMA 链表、查询缓存和数量，pgdir 初始为空。
+ *
+ * 成功返回管理对象，失败返回 NULL；初始没有 VMA，map_count=0。
+ * mmap_cache 缓存最近命中区域，pgdir 保存所属页表，二者在创建时都为空。
  */
 struct mm_struct *
 mm_create(void)
@@ -87,6 +90,9 @@ mm_create(void)
  * 中文导读：vma_create
  * 创建虚拟内存区间描述符，记录左闭右开的地址区间 [vm_start, vm_end) 及权限标志。
  * 创建描述符只记录范围，页表映射由内存管理路径另外维护。
+ *
+ * vm_start 是包含的起点，vm_end 是不包含的终点，vm_flags 表示读写执行意图。
+ * 返回对象随后还要由 insert_vma_struct 关联到 mm；申请失败返回 NULL。
  */
 struct vma_struct *
 vma_create(uintptr_t vm_start, uintptr_t vm_end, uint32_t vm_flags)
@@ -106,6 +112,9 @@ vma_create(uintptr_t vm_start, uintptr_t vm_end, uint32_t vm_flags)
 /*
  * 中文导读：find_vma
  * 查找包含 addr 的 VMA。先看最近命中缓存，未命中再遍历链表；找到后更新缓存，否则返回 NULL。
+ *
+ * 例如区间 [0x1000,0x2000) 包含 0x1fff，不包含 0x2000。
+ * 缓存未命中时遍历，只有包含地址的区间才返回；成功后写回缓存以加速下一次查找。
  */
 struct vma_struct *
 find_vma(struct mm_struct *mm, uintptr_t addr)
@@ -144,6 +153,9 @@ find_vma(struct mm_struct *mm, uintptr_t addr)
 /*
  * 中文导读：check_vma_overlap
  * 断言两个区间自身非空且前一区间结束位置不超过后一区间起点，允许首尾相接。
+ *
+ * prev 和 next 必须按照起始地址顺序排列。
+ * 允许 prev->vm_end==next->vm_start，因为左闭右开区间在这个边界上没有重叠。
  */
 static inline void
 check_vma_overlap(struct vma_struct *prev, struct vma_struct *next)
@@ -158,6 +170,9 @@ check_vma_overlap(struct vma_struct *prev, struct vma_struct *next)
  * 中文导读：insert_vma_struct
  * 按区间起始地址有序插入 VMA，插入前检查它与前后区间不重叠。
  * 然后建立 vma 到 mm 的关联并增加 map_count。
+ *
+ * mm 是所属地址空间，vma 是尚待登记的区间，函数修改链表和数量而无返回值。
+ * 先找有序位置并断言前后无重叠，再关联 vm_mm，最后增加 map_count。
  */
 void insert_vma_struct(struct mm_struct *mm, struct vma_struct *vma)
 {
@@ -199,6 +214,9 @@ void insert_vma_struct(struct mm_struct *mm, struct vma_struct *vma)
  * 中文导读：mm_destroy
  * 依次摘除并释放 mm 中的所有 VMA 描述符，再释放 mm 对象。
  * 这里处理的是管理对象，调用者还需考虑页表和映射资源的生命周期。
+ *
+ * 每次从哨兵后摘除第一个节点，直到链表为空，避免访问已经释放的链表节点。
+ * 末尾 mm=NULL 只改变本地变量，调用者保存的指针仍需自行管理，不能继续解引用。
  */
 void mm_destroy(struct mm_struct *mm)
 {
@@ -218,6 +236,9 @@ void mm_destroy(struct mm_struct *mm)
 /*
  * 中文导读：vmm_init
  * 调用虚拟内存管理自检，验证 VMA 创建、插入与查找等基础逻辑。
+ *
+ * 本实验通过自检验证 VMA 的软件管理结构，后续线程创建还会检查 mm 是否为空。
+ * 初始化通过并不自动为每个线程创建独立用户页表。
  */
 void vmm_init(void)
 {
@@ -228,6 +249,9 @@ void vmm_init(void)
 /*
  * 中文导读：check_vmm
  * 运行 VMA 自检并打印结果，当前源码中的缺页测试调用处于注释状态。
+ *
+ * 当前只执行 check_vma_struct，check_pgfault 调用被注释。
+ * 因此成功输出证明此次实际运行的 VMA 测试完成，缺页恢复仍需独立实现和验证。
  */
 static void
 check_vmm(void)

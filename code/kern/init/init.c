@@ -20,6 +20,10 @@ void grade_backtrace(void);
  * 中文导读：kern_init
  * 内核 C 入口，先清 BSS，再初始化设备树、输出、内存和 Trap 支持。
  * proc_init 建立 idle/init 后设置时钟并开启中断，最后进入 cpu_idle，后续由调度器交接执行流。
+ *
+ * edata 到 end 是 BSS 区间，清零后全局指针和计数拥有确定初值。
+ * dtb_init 提供物理内存范围，pmm_init 为 PCB、栈和页表提供资源，因此必须先于 proc_init。
+ * 最后 idle 复用当前执行流，初始 need_resched 使它调度 init；kern_init 不会正常返回。
  */
 int kern_init(void)
 {

@@ -201,6 +201,9 @@ void slob_init(void)
 /*
  * 中文导读：kmalloc_init
  * 初始化内核小块分配器并打印结果。PCB 等对象通过 kmalloc 从这里提供的接口申请。
+ *
+ * 这里调用 slob_init 并输出初始化完成信息，内存页来源依赖已完成的物理页初始化。
+ * 因此 pmm_init 在物理页和页表自检之后再调用它。
  */
 inline void
 kmalloc_init(void)
@@ -233,6 +236,9 @@ static int find_order(int size)
  * 中文导读：__kmalloc
  * 小对象交给 SLOB，并在返回对象前保留管理头；大对象另建记录并申请连续物理页。
  * 大块申请失败时归还管理记录，避免创建失败留下记录对象。
+ *
+ * 小块申请额外加一个 SLOB_UNIT 存管理头，返回 m+1 跳过头部。
+ * 大块由 bigblocks 链表追踪基址和 order，释放时可据此找到对应页数。
  */
 static void *__kmalloc(size_t size, gfp_t gfp)
 {
@@ -270,6 +276,9 @@ static void *__kmalloc(size_t size, gfp_t gfp)
  * 中文导读：kmalloc
  * 申请 size 字节的内核对象，返回内核虚拟地址，失败返回 NULL。
  * 内部转入 __kmalloc，具体使用小块管理或连续页取决于申请大小。
+ *
+ * size 是字节数，常见调用 kmalloc(sizeof(struct proc_struct)) 申请一个 PCB。
+ * 返回空间尚需调用者初始化字段；free 时把原返回指针交给 kfree。
  */
 void *
 kmalloc(size_t size)
@@ -281,6 +290,9 @@ kmalloc(size_t size)
  * 中文导读：kfree
  * 释放此前 kmalloc 返回的对象，空指针直接返回。
  * 先尝试识别大块记录并归还整段物理页；普通小块通过对象前的管理头交给 slob_free 合并。
+ *
+ * 普通小块通过向前退一个 slob_t 找管理头；整页对齐的地址先检查是否属于大块链表。
+ * 同一对象只能释放一次，仍被 current、链表或其他指针持有时不能提前释放。
  */
 void kfree(void *block)
 {

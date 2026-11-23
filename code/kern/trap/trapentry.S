@@ -129,6 +129,8 @@ __trapret:
  
     .globl forkrets
 forkrets:
+    # 调用链为 forkret -> forkrets -> __trapret -> RESTORE_ALL -> sret。
+    # 这里的跳转不依赖一次真实硬件中断，创建者预先构造的现场就能驱动同样的恢复动作。
     # 新线程首次启动复用 Trap 返回路径。a0 是创建阶段布置的初始 TrapFrame。
     # set stack to this new process's trapframe
     move sp, a0

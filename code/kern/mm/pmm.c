@@ -38,6 +38,9 @@ static void check_boot_pgdir(void);
 /*
  * 中文导读：init_pmm_manager
  * 选择物理页分配器并调用其初始化入口。接口名为 default，当前实际绑定 Best-Fit 实现。
+ *
+ * pmm_manager 是统一函数表指针，后续申请释放通过它调用具体算法。
+ * 先调用 init 建空链表，再由 page_init 登记可用内存，因此两步顺序不可颠倒。
  */
 static void init_pmm_manager(void)
 {
@@ -50,6 +53,9 @@ static void init_pmm_manager(void)
 /*
  * 中文导读：init_memmap
  * 把 base 起始的 n 个可用页登记到当前分配器。调用者先排除内核和描述符占用区。
+ *
+ * base 指向区间首页的描述符，n 是页数；具体块长与链表节点由所选算法维护。
+ * 输入范围必须完整处于描述符数组管理范围内，不能把尚在使用的内核页登记为空闲。
  */
 static void init_memmap(struct Page *base, size_t n)
 {
@@ -62,6 +68,9 @@ static void init_memmap(struct Page *base, size_t n)
  * 中文导读：alloc_pages
  * 申请 n 个连续物理页，返回块首页的 Page 指针，失败返回 NULL。
  * 保存并关闭本 hart 中断后调用分配器，避免本 hart 的中断路径同时改动空闲链表。
+ *
+ * 调用成功后返回连续块首页，连续 n 页可以作为内核栈或较大的内核缓冲区。
+ * 本函数只获得物理页所有权，清零、映射权限与对象初始化由上层按用途完成。
  */
 struct Page *alloc_pages(size_t n)
 {
@@ -79,6 +88,9 @@ struct Page *alloc_pages(size_t n)
 /*
  * 中文导读：free_pages
  * 归还 base 起始的 n 个连续页。通过中断保护调用分配器，后者负责插回并合并相邻空闲块。
+ *
+ * base 和 n 必须与实际持有的区间一致，错误范围会破坏分配器账目。
+ * 调用结束后原指针指向的内存可能被复用，调用者应先清除仍会使用它的映射或引用。
  */
 void free_pages(struct Page *base, size_t n)
 {
@@ -95,6 +107,9 @@ void free_pages(struct Page *base, size_t n)
 /*
  * 中文导读：nr_free_pages
  * 读取当前空闲物理页总数。读取期间保护本 hart 中断状态，返回的是页数。
+ *
+ * 返回值以页为单位，乘 PGSIZE 才得到空闲字节数。
+ * 自检会保存操作前的页数，再在释放资源后比较，用于发现页面泄漏。
  */
 size_t nr_free_pages(void)
 {
@@ -114,6 +129,11 @@ size_t nr_free_pages(void)
  * 根据设备树内存范围建立 Page 描述符数组，数组紧随内核末尾并按页对齐。
  * 先将页面标为保留，排除内核、描述符和超出内核管理上限的区间，再登记剩余完整空闲页。
  * 注意 end 是虚拟地址，计算物理布局时使用 PADDR，避免描述符和空闲区重叠。
+ *
+ * mem_begin 与 mem_size 来自设备树，maxpa 被内核可映射上限截断。
+ * npage 是物理页号上界，描述符个数用 npage-nbase 计算，不能直接把 npage 当数组长度。
+ * 先为描述符数组本身预留空间，再按页向上对齐得到 free_begin，避免分配器覆盖自己的管理数据。
+ * 只有 free_begin<free_end 时才登记空闲区，避免产生长度为零或越界的区间。
  */
 static void page_init(void) {
     // 内核虚拟地址 = 物理地址 + 固定偏移，这个偏移要最先确定
@@ -188,6 +208,9 @@ static void page_init(void) {
  * 中文导读：enable_paging
  * 将启动页表物理基址编码为 Sv39 的 satp 值。低位存根页表物理页号，高四位为模式 8。
  * 调用时必须保证当前取指地址和后续访问地址在目标页表中有有效映射。
+ *
+ * pgdir 存物理根地址，satp 中写入的是物理页号，所以需要右移 RISCV_PGSHIFT。
+ * 写 satp 与刷新 TLB 是不同操作，移植调用流程时还需保证刷新和当前取指映射。
  */
 static void enable_paging(void)
 {
@@ -204,6 +227,9 @@ static void enable_paging(void)
  * 中文导读：boot_map_segment
  * 为 la 开始、size 字节的区间逐页建立到 pa 的映射，perm 指定权限。
  * 先处理起始地址的页内偏移，通过 get_pte 创建所需下级表，再写入各页的物理页号。
+ *
+ * 逐页写 PTE 前先把 la/pa 对齐，处理原地址的页内偏移，使 size 覆盖所需全部页面。
+ * get_pte 失败时触发断言，因此该启动辅助函数要求内存足够建立映射。
  */
 static void boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size,
                              uintptr_t pa, uint32_t perm)
@@ -227,6 +253,9 @@ static void boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size,
 /*
  * 中文导读：boot_alloc_page
  * 启动阶段申请一页并返回其内核虚拟地址。分配失败直接 panic，供启动代码建立必要结构。
+ *
+ * alloc_page 返回描述符，page2kva 把它变成内核可以直接访问的指针。
+ * 启动必需结构无法分配时无法安全继续，因此该函数直接报告致命失败。
  */
 static void *boot_alloc_page(void)
 {
@@ -245,6 +274,9 @@ static void *boot_alloc_page(void)
  * 中文导读：pmm_init
  * 串起物理内存初始化。选择分配器、登记物理页、运行分配自检，取得启动页表地址。
  * 接着检查页表及内核映射，最后初始化 kmalloc，为创建 PCB 等小对象提供内存。
+ *
+ * 先有可用物理页，get_pte 才能申请页表；先有小块分配器，alloc_proc 才能申请 PCB。
+ * boot_pgdir_va 用于内核读写页表，boot_pgdir_pa 用于 satp 硬件装载，二者不能混用。
  */
 void pmm_init(void)
 {
@@ -294,6 +326,11 @@ void pmm_init(void)
  * create 为真时允许申请缺失的两级下级表，为假时缺表返回 NULL。
  * 新中间表暂存到后续申请成功才发布，第二次申请失败会释放本次新表；目录项只带合法目录标志。
  * 返回的是页表项地址，调用者还需检查 PTE_V 判断该虚拟页是否已经映射。
+ *
+ * PDX1、PDX0、PTX 分别取虚拟地址的三级索引，每一级选择一个表项。
+ * 目录项保存物理页号，用 PDE_ADDR 还原物理基址，再通过 KADDR 转换后才能在 C 中解引用。
+ * 返回非空仅说明末级槽位可访问，即使 *ptep=0 也可以返回该槽位，供 page_insert 写入。
+ * create=true 仅在缺表时申请，并不直接给 la 分配数据页；本实现面向路径上的普通下级表，不展开巨大页叶项。
  */
 pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create)
 {
@@ -341,6 +378,9 @@ pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create)
  * 中文导读：get_page
  * 查找 la 已映射的物理页，缺表或无有效映射时返回 NULL。
  * ptep_store 非空时同时返回页表项地址，便于调用者清除或修改该项。
+ *
+ * pgdir 和 la 指定待查映射，ptep_store 是可选的输出参数，类型为 pte_t **。
+ * 通过 get_pte(...,0) 查询，不会因为读取映射而新建页表；有效位为真后才用 pte2page 还原物理页描述符。
  */
 struct Page *get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store)
 {
@@ -362,6 +402,11 @@ struct Page *get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store)
  * 将物理页 page 映射到 la，perm 指定权限，成功返回 0，页表分配失败返回 -E_NO_MEM。
  * 新旧物理页不同时增加新页引用，再写新映射并刷新地址翻译，随后减少旧页引用并按需释放。
  * 映射同一页只更新权限，不改变引用数；pte_create 会自动设置有效位 PTE_V。
+ *
+ * 三种情况分别是空槽首次映射、旧页替换成另一页、同页只调整权限。
+ * 例如原来映射 A，现在改成 B：B.ref 加一，PTE 写 B，失效旧翻译，A.ref 减一，归零才释放 A。
+ * 同页分支跳过引用增减，避免把仍在映射的页意外释放；分配下级表失败时在改写原映射前返回。
+ * perm 可组合 U/R/W/X 等位，pte_create 自动加 V；软件测试所用某些权限组合只检查账目，不代表可实际访存。
  */
 int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
 {
@@ -389,6 +434,10 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
  * 中文导读：page_remove
  * 撤销 la 的有效映射，未映射时直接结束，因此重复移除也安全。
  * 先清页表项并刷新对应 TLB，再减少物理页引用，引用归零才将物理页交回分配器。
+ *
+ * 例如 A 被两个地址映射，移除一个后 A.ref 从 2 变 1，保留物理页；最后一个移除后才回收。
+ * 清 PTE 后先失效 TLB，再释放页面，可以避免缓存旧翻译继续访问已经被复用的物理页。
+ * 此函数回收数据页，空的中间页表仍由相应管理或清理流程处理。
  */
 void page_remove(pde_t *pgdir, uintptr_t la)
 {
@@ -412,6 +461,9 @@ void page_remove(pde_t *pgdir, uintptr_t la)
  * 中文导读：tlb_invalidate
  * 让本 hart 丢弃 la 对应的缓存翻译，x0 表示涵盖全部 ASID。
  * memory clobber 约束编译器重排相关内存操作；pgdir 参数当前未用于筛选正在使用的页表。
+ *
+ * la 是需要失效的虚拟地址，硬件会按地址对应的映射处理缓存。
+ * sfence.vma 作用于当前 hart，本实验单 hart 使用；跨核缓存同步需独立机制。
  */
 void tlb_invalidate(pde_t *pgdir, uintptr_t la)
 {
@@ -423,6 +475,9 @@ void tlb_invalidate(pde_t *pgdir, uintptr_t la)
 /*
  * 中文导读：check_alloc_page
  * 执行当前分配器的自检，断言覆盖申请、释放和空闲块管理，完成后输出成功标志。
+ *
+ * 实际测试函数来自 pmm_manager->check，因此换分配器后这项入口可以复用。
+ * 输出成功信息表示测试执行到了末尾，具体检查范围仍由该分配器测试决定。
  */
 static void check_alloc_page(void)
 {
@@ -434,6 +489,9 @@ static void check_alloc_page(void)
  * 中文导读：check_pgdir
  * 检查页表查找、创建、替换映射及引用数变化，再回收本次测试使用的页表。
  * 同时检查非叶目录项没有 U/A/D 标志，符合这里使用的 Sv39 目录格式。
+ *
+ * 测试通过 get_pte、page_insert、page_remove 来检查接口间的配合。
+ * 映射同页和不同页的引用数是重点，最后释放测试页表并比较空闲页总数。
  */
 static void check_pgdir(void)
 {
@@ -501,6 +559,9 @@ static void check_pgdir(void)
  * 中文导读：check_boot_pgdir
  * 通过两个低地址别名映射同一物理页，实际写入和读取字符串验证地址翻译。
  * 最后回收测试页与下级页表、刷新 TLB，并比较空闲页数是否恢复。
+ *
+ * 把同一页映射到 0x100 和 0x100+PGSIZE，一处写入后从另一处应读到相同内容。
+ * 这是实际访存检查，目录项、叶项权限和 TLB 都会影响结果，比单纯读取 PTE 覆盖更多硬件路径。
  */
 static void check_boot_pgdir(void)
 {

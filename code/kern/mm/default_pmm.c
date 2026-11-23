@@ -15,6 +15,9 @@ static free_area_t free_area;
 /*
  * 中文导读：best_fit_init
  * 建立空闲块循环链表并把空闲页总数清零。可用区间由后续 init_memmap 登记。
+ *
+ * free_list 是带哨兵的双向循环链表，空表时前后都指向自身。
+ * nr_free 是全部空闲块页数之和，不是块的数量。
  */
 static void
 best_fit_init(void) {
@@ -27,6 +30,9 @@ best_fit_init(void) {
  * 中文导读：best_fit_init_memmap
  * 把 base 起始的 n 页设为空闲，在首页记录块长，按物理地址顺序插入链表。
  * 地址有序使后续释放时能够方便检查左右物理邻居。
+ *
+ * 区间中的每页先清管理标志和引用数，只有块首页设置 PageProperty 和 property=n。
+ * 地址升序用于找物理邻居，申请时仍然扫描全表寻找最小够用块。
  */
 static void
 best_fit_init_memmap(struct Page *base, size_t n) {
@@ -61,6 +67,9 @@ best_fit_init_memmap(struct Page *base, size_t n) {
  * 中文导读：best_fit_alloc_pages
  * 申请连续 n 页。遍历空闲块，选择能够容纳 n 页且长度最小的块。
  * 从块首分配，尾部剩余部分重新入链，更新块首标志及空闲总数；找不到则返回 NULL。
+ *
+ * 例如空闲块有 3、8、12 页，申请 6 页会取 8 页块，剩余 2 页重新成为空闲块。
+ * 先保存前驱节点再摘下候选，便于把余块放回原地址位置；总空闲数不足时提前返回 NULL。
  */
 static struct Page *
 best_fit_alloc_pages(size_t n) {
@@ -113,6 +122,9 @@ best_fit_alloc_pages(size_t n) {
  * 中文导读：best_fit_free_pages
  * 归还连续 n 页，重置每页的管理信息并按地址插回空闲链表。
  * 先与前邻居合并，再与后邻居合并；只有物理地址连续才合并，最终只保留一个块首。
+ *
+ * 释放区间插回后，前块地址+前块长度等于 base 才能前向合并。
+ * 合并后 base 可能变成前块，再检查新块末尾与后块起点；合并只改变分块，不额外增加总空闲页数。
  */
 static void
 best_fit_free_pages(struct Page *base, size_t n) {
@@ -170,6 +182,9 @@ best_fit_free_pages(struct Page *base, size_t n) {
 /*
  * 中文导读：best_fit_nr_free_pages
  * 返回已维护的空闲页总数。该计数随申请减少、随释放增加。
+ *
+ * 调用者通过统一 pmm_manager 接口读取结果，避免直接依赖具体空闲链表。
+ * 释放合并前后总页数相同，nr_free 只由真正的申请和归还改变。
  */
 static size_t
 best_fit_nr_free_pages(void) {
@@ -182,6 +197,9 @@ best_fit_nr_free_pages(void) {
  * 中文导读：basic_check
  * 验证基本页分配行为，包括多次申请、释放以及临时耗尽空闲链表的情况。
  * 测试会保存并恢复原分配器状态，断言失败说明实际行为不符合预期。
+ *
+ * 临时把原空闲链表保存起来，可以构造可控的内存不足情况。
+ * 测试结束应把页面和原链表状态恢复，防止测试自身影响后续初始化。
  */
 static void
 basic_check(void) {
@@ -237,6 +255,9 @@ basic_check(void) {
 /*
  * 中文导读：best_fit_check
  * 在基本检查后验证连续块申请、拆分和回收，并检查最终空闲块数及页数是否恢复。
+ *
+ * 通过多页申请和再分配检查拆分结果，再释放并统计链表块长。
+ * 最终块数和总页数恢复，是检查空闲块合并及页面回收的重要依据。
  */
 static void
 best_fit_check(void) {

@@ -8,6 +8,9 @@
  * 中文导读：wakeup_proc
  * 把未初始化或睡眠的线程变为 PROC_RUNNABLE，使调度器能够选中它。
  * 断言拒绝唤醒僵尸和已经可运行的线程；具体执行时间由后续 schedule 决定。
+ *
+ * 参数 proc 指向已建立资源的目标 PCB，本函数没有返回值，也不会直接跳到目标代码。
+ * 创建者调用后，线程状态从 UNINIT 进入 RUNNABLE；以后调度器遍历到它才可能运行。
  */
 void
 wakeup_proc(struct proc_struct *proc) {
@@ -21,6 +24,11 @@ wakeup_proc(struct proc_struct *proc) {
  * 完成一次线程选择。关中断后清除当前请求，从当前节点的后继扫描；idle 从总链表头之后开始。
  * 跳过哨兵，最多绕一圈，只选择 RUNNABLE；没有候选时回退到 idle。
  * 目标 runs 统计被选次数，包括选回自己；不同目标通过 proc_run 交接，返回时恢复本层中断状态。
+ *
+ * 例如表头→A→B→C，当前为 C，则扫描表头、A、B、C，遇到哨兵只绕回，不提前结束。
+ * 循环回到 start 才完成一圈，当前线程依旧可运行时可以最后选回自己。
+ * next 预置 idle 能覆盖空表及所有普通线程睡眠的情况；runs 增加代表被选次数。
+ * 本函数可能随 switch_to 暂停，之后同一线程恢复时，才执行末尾的 local_intr_restore。
  */
 void
 schedule(void)
