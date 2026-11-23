@@ -5,6 +5,11 @@
 #include <intr.h>
 #include <riscv.h>
 
+/*
+ * 中文导读：__intr_save
+ * 读取本 hart 的 sstatus.SIE。原来开启则先关闭并返回 true，原来关闭则返回 false。
+ * 返回值由调用者的栈保存，用于退出当前临界区时恢复原状态。
+ */
 static inline bool __intr_save(void) {
     if (read_csr(sstatus) & SSTATUS_SIE) {
         intr_disable();
@@ -13,6 +18,11 @@ static inline bool __intr_save(void) {
     return 0;
 }
 
+/*
+ * 中文导读：__intr_restore
+ * flag 为 true 才开启监督级中断，false 时维持关闭。
+ * 配合保存旧状态支持嵌套临界区；单 hart 的中断屏蔽不提供跨 hart 互斥。
+ */
 static inline void __intr_restore(bool flag) {
     if (flag) {
         intr_enable();

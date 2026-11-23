@@ -16,6 +16,11 @@
 int kern_init(void) __attribute__((noreturn));
 void grade_backtrace(void);
 
+/*
+ * 中文导读：kern_init
+ * 内核 C 入口，先清 BSS，再初始化设备树、输出、内存和 Trap 支持。
+ * proc_init 建立 idle/init 后设置时钟并开启中断，最后进入 cpu_idle，后续由调度器交接执行流。
+ */
 int kern_init(void)
 {
     extern char edata[], end[];

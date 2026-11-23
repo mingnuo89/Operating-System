@@ -62,6 +62,10 @@ static void check_vma_struct(void);
 static void check_pgfault(void);
 
 // mm_create -  alloc a mm_struct & initialize it.
+/*
+ * 中文导读：mm_create
+ * 分配一个地址空间管理对象，初始化 VMA 链表、查询缓存和数量，pgdir 初始为空。
+ */
 struct mm_struct *
 mm_create(void)
 {
@@ -79,6 +83,11 @@ mm_create(void)
 }
 
 // vma_create - alloc a vma_struct & initialize it. (addr range: vm_start~vm_end)
+/*
+ * 中文导读：vma_create
+ * 创建虚拟内存区间描述符，记录左闭右开的地址区间 [vm_start, vm_end) 及权限标志。
+ * 创建描述符只记录范围，页表映射由内存管理路径另外维护。
+ */
 struct vma_struct *
 vma_create(uintptr_t vm_start, uintptr_t vm_end, uint32_t vm_flags)
 {
@@ -94,6 +103,10 @@ vma_create(uintptr_t vm_start, uintptr_t vm_end, uint32_t vm_flags)
 }
 
 // find_vma - find a vma  (vma->vm_start <= addr <= vma_vm_end)
+/*
+ * 中文导读：find_vma
+ * 查找包含 addr 的 VMA。先看最近命中缓存，未命中再遍历链表；找到后更新缓存，否则返回 NULL。
+ */
 struct vma_struct *
 find_vma(struct mm_struct *mm, uintptr_t addr)
 {
@@ -128,6 +141,10 @@ find_vma(struct mm_struct *mm, uintptr_t addr)
 }
 
 // check_vma_overlap - check if vma1 overlaps vma2 ?
+/*
+ * 中文导读：check_vma_overlap
+ * 断言两个区间自身非空且前一区间结束位置不超过后一区间起点，允许首尾相接。
+ */
 static inline void
 check_vma_overlap(struct vma_struct *prev, struct vma_struct *next)
 {
@@ -137,6 +154,11 @@ check_vma_overlap(struct vma_struct *prev, struct vma_struct *next)
 }
 
 // insert_vma_struct -insert vma in mm's list link
+/*
+ * 中文导读：insert_vma_struct
+ * 按区间起始地址有序插入 VMA，插入前检查它与前后区间不重叠。
+ * 然后建立 vma 到 mm 的关联并增加 map_count。
+ */
 void insert_vma_struct(struct mm_struct *mm, struct vma_struct *vma)
 {
     assert(vma->vm_start < vma->vm_end);
@@ -173,6 +195,11 @@ void insert_vma_struct(struct mm_struct *mm, struct vma_struct *vma)
 }
 
 // mm_destroy - free mm and mm internal fields
+/*
+ * 中文导读：mm_destroy
+ * 依次摘除并释放 mm 中的所有 VMA 描述符，再释放 mm 对象。
+ * 这里处理的是管理对象，调用者还需考虑页表和映射资源的生命周期。
+ */
 void mm_destroy(struct mm_struct *mm)
 {
 
@@ -188,12 +215,20 @@ void mm_destroy(struct mm_struct *mm)
 
 // vmm_init - initialize virtual memory management
 //          - now just call check_vmm to check correctness of vmm
+/*
+ * 中文导读：vmm_init
+ * 调用虚拟内存管理自检，验证 VMA 创建、插入与查找等基础逻辑。
+ */
 void vmm_init(void)
 {
     check_vmm();
 }
 
 // check_vmm - check correctness of vmm
+/*
+ * 中文导读：check_vmm
+ * 运行 VMA 自检并打印结果，当前源码中的缺页测试调用处于注释状态。
+ */
 static void
 check_vmm(void)
 {

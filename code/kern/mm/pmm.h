@@ -163,17 +163,20 @@ page_ref_dec(struct Page *page)
 
 static inline void flush_tlb()
 {
+    // 全量同步本 hart 的翻译；memory 约束编译器重排相关页表内存访问。
     asm volatile("sfence.vma" ::: "memory");
 }
 
 // construct PTE from a page and permission bits
 static inline pte_t pte_create(uintptr_t ppn, int type)
 {
+    // PPN 编码到高位，低位包含有效位与调用者指定权限。
     return (ppn << PTE_PPN_SHIFT) | PTE_V | type;
 }
 
 static inline pte_t ptd_create(uintptr_t ppn)
 {
+    // 目录项只设置 V，R/W/X 为零告诉硬件继续向下查表。
     return pte_create(ppn, PTE_V);
 }
 

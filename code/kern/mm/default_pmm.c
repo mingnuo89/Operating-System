@@ -12,6 +12,10 @@ static free_area_t free_area;
 #define free_list (free_area.free_list)
 #define nr_free (free_area.nr_free)
 
+/*
+ * 中文导读：best_fit_init
+ * 建立空闲块循环链表并把空闲页总数清零。可用区间由后续 init_memmap 登记。
+ */
 static void
 best_fit_init(void) {
     // 初始化空闲块链表及计数；可用物理内存稍后由 best_fit_init_memmap 加入。
@@ -19,6 +23,11 @@ best_fit_init(void) {
     nr_free = 0;
 }
 
+/*
+ * 中文导读：best_fit_init_memmap
+ * 把 base 起始的 n 页设为空闲，在首页记录块长，按物理地址顺序插入链表。
+ * 地址有序使后续释放时能够方便检查左右物理邻居。
+ */
 static void
 best_fit_init_memmap(struct Page *base, size_t n) {
     assert(n > 0);
@@ -48,6 +57,11 @@ best_fit_init_memmap(struct Page *base, size_t n) {
     list_add_before(&free_list, &(base->page_link));
 }
 
+/*
+ * 中文导读：best_fit_alloc_pages
+ * 申请连续 n 页。遍历空闲块，选择能够容纳 n 页且长度最小的块。
+ * 从块首分配，尾部剩余部分重新入链，更新块首标志及空闲总数；找不到则返回 NULL。
+ */
 static struct Page *
 best_fit_alloc_pages(size_t n) {
     assert(n > 0);
@@ -95,6 +109,11 @@ best_fit_alloc_pages(size_t n) {
     return best;
 }
 
+/*
+ * 中文导读：best_fit_free_pages
+ * 归还连续 n 页，重置每页的管理信息并按地址插回空闲链表。
+ * 先与前邻居合并，再与后邻居合并；只有物理地址连续才合并，最终只保留一个块首。
+ */
 static void
 best_fit_free_pages(struct Page *base, size_t n) {
     assert(n > 0);
@@ -148,6 +167,10 @@ best_fit_free_pages(struct Page *base, size_t n) {
     }
 }
 
+/*
+ * 中文导读：best_fit_nr_free_pages
+ * 返回已维护的空闲页总数。该计数随申请减少、随释放增加。
+ */
 static size_t
 best_fit_nr_free_pages(void) {
     // 返回分配器维护的空闲页总数；分配成功和释放时分别扣减、增加该值。
@@ -155,6 +178,11 @@ best_fit_nr_free_pages(void) {
 }
 
 // Framework tests: students must not modify basic_check or best_fit_check.
+/*
+ * 中文导读：basic_check
+ * 验证基本页分配行为，包括多次申请、释放以及临时耗尽空闲链表的情况。
+ * 测试会保存并恢复原分配器状态，断言失败说明实际行为不符合预期。
+ */
 static void
 basic_check(void) {
     struct Page *p0, *p1, *p2;
@@ -206,6 +234,10 @@ basic_check(void) {
     free_page(p2);
 }
 
+/*
+ * 中文导读：best_fit_check
+ * 在基本检查后验证连续块申请、拆分和回收，并检查最终空闲块数及页数是否恢复。
+ */
 static void
 best_fit_check(void) {
     int score = 0, sumscore = 6;

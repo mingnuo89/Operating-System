@@ -82,6 +82,10 @@ void forkrets(struct trapframe *tf);
 void switch_to(struct context *from, struct context *to);
 
 // set_proc_name - set the name of proc
+/*
+ * 中文导读：set_proc_name
+ * 给 PCB 设置名字。先清空缓冲区，再复制固定长度内容；名字用于输出和调试，不参与调度选择。
+ */
 char *
 set_proc_name(struct proc_struct *proc, const char *name)
 {
@@ -90,6 +94,11 @@ set_proc_name(struct proc_struct *proc, const char *name)
 }
 
 // get_proc_name - get the name of proc
+/*
+ * 中文导读：get_proc_name
+ * 把 PCB 名字复制到带末尾零的静态缓冲区，供打印使用。
+ * 后续调用会覆盖同一个缓冲区，因此调用者应及时使用返回值。
+ */
 char *
 get_proc_name(struct proc_struct *proc)
 {
@@ -99,6 +108,11 @@ get_proc_name(struct proc_struct *proc)
 }
 
 // get_pid - alloc a unique pid for process
+/*
+ * 中文导读：get_pid
+ * 为新线程寻找未占用的正 PID。last_pid 记录上次分配位置，next_safe 缓存可连续使用区间的上界。
+ * 到达边界时扫描进程链表避开已有 PID，到 MAX_PID 后回绕；创建者在关中断区调用。
+ */
 static int
 get_pid(void)
 {
@@ -145,6 +159,11 @@ get_pid(void)
 // forkret -- the first kernel entry point of a new thread/process
 // NOTE: the addr of forkret is setted in copy_thread function
 //       after switch_to, the current proc will execute here.
+/*
+ * 中文导读：forkret
+ * 新线程第一次被 switch_to 选中时从这里开始。
+ * 把 current 的初始 TrapFrame 交给 forkrets，随后经 __trapret 和 sret 进入线程包装入口。
+ */
 static void
 forkret(void)
 {
@@ -152,6 +171,11 @@ forkret(void)
 }
 
 // hash_proc - add proc into proc hash_list
+/*
+ * 中文导读：hash_proc
+ * 将线程加入按 PID 散列的桶链表。这样 find_proc 可以缩小查找范围。
+ * 调用前必须分配好 PID；进程总链表还要由创建代码另外登记。
+ */
 static void
 hash_proc(struct proc_struct *proc)
 {
@@ -159,6 +183,11 @@ hash_proc(struct proc_struct *proc)
 }
 
 // find_proc - find proc frome proc hash_list according to pid
+/*
+ * 中文导读：find_proc
+ * 按 PID 查找 PCB，非法 PID 或查无结果时返回 NULL。
+ * 先计算哈希桶，再遍历桶内链表逐个比较 PID，处理哈希冲突。
+ */
 struct proc_struct *
 find_proc(int pid)
 {
@@ -179,6 +208,11 @@ find_proc(int pid)
 
 
 // setup_kstack - alloc pages with size KSTACKPAGE as process kernel stack
+/*
+ * 中文导读：setup_kstack
+ * 为目标线程申请 KSTACKPAGE 个连续物理页，将其内核虚拟地址存入 kstack。
+ * 成功返回 0，失败返回 -E_NO_MEM；此时只准备了栈空间，初始现场由 copy_thread 布置。
+ */
 static int
 setup_kstack(struct proc_struct *proc)
 {
@@ -192,6 +226,11 @@ setup_kstack(struct proc_struct *proc)
 }
 
 // put_kstack - free the memory space of process kernel stack
+/*
+ * 中文导读：put_kstack
+ * 释放线程此前申请的整段内核栈。kstack 是虚拟地址，先转换到对应 Page 描述符。
+ * 用于创建失败的清理路径，调用时该线程不能仍在这段栈上执行。
+ */
 static void
 put_kstack(struct proc_struct *proc)
 {
@@ -203,12 +242,22 @@ put_kstack(struct proc_struct *proc)
 //   1. call exit_mmap & put_pgdir & mm_destroy to free the almost all memory space of process
 //   2. set process' state as PROC_ZOMBIE, then call wakeup_proc(parent) to ask parent reclaim itself.
 //   3. call scheduler to switch to other process
+/*
+ * 中文导读：do_exit
+ * 当前实验保留的退出占位入口。线程函数返回后会到达这里，打印 panic 并进入调试监视器。
+ * 资源释放、僵尸状态和唤醒父线程尚待后续实验实现。
+ */
 int do_exit(int error_code)
 {
     panic("process exit!!.\n");
 }
 
 // init_main - the second kernel thread used to create user_main kernel threads
+/*
+ * 中文导读：init_main
+ * init 线程实际执行的函数。输出自己的 PID、名称与传入的问候，然后返回 0。
+ * 课程调度测试会在临时副本中注入到函数开头；返回后由包装入口调用 do_exit。
+ */
 static int
 init_main(void *arg)
 {
@@ -222,6 +271,12 @@ init_main(void *arg)
 
 // alloc_proc - alloc a proc_struct and init all fields of proc_struct
 // 返回一个所有字段都处于确定初始状态的 PCB，避免后续代码误用未初始化字段
+/*
+ * 中文导读：alloc_proc
+ * 申请并初始化一份 PCB，内存不足时返回 NULL。
+ * 先设为未初始化、PID=-1，清空上下文与名字，初始化链表节点；内核线程默认共享启动页表。
+ * 本函数提供管理信息，真正的内核栈和运行入口由后续创建步骤准备。
+ */
 static struct proc_struct *
 alloc_proc(void)
 {
@@ -248,6 +303,11 @@ alloc_proc(void)
 
 // proc_init - set up the first kernel thread idleproc "idle" by itself and
 //           - create the second kernel thread init_main
+/*
+ * 中文导读：proc_init
+ * 建立进程管理的初始状态。初始化总链表和 PID 哈希桶，创建 PID=0 的 idle 并让 current 指向它。
+ * idle 复用启动栈，need_resched=1 保证进入空闲循环后马上调度；再创建 init_main 线程并命名为 init。
+ */
 void proc_init(void)
 {
     int i;
@@ -291,6 +351,12 @@ void proc_init(void)
 // kernel_thread - create a kernel thread using "fn" function
 // NOTE: the contents of temp trapframe tf will be copied to
 //       proc->tf in do_fork-->copy_thread function
+/*
+ * 中文导读：kernel_thread
+ * 将函数 fn 和参数 arg 包装成新内核线程，返回新 PID 或负错误码。
+ * 初始 TrapFrame 的 s0 保存 fn、s1 保存 arg、epc 指向 kernel_thread_entry。
+ * 设置 SPP/SPIE 后交给 do_fork；首次 sret 将返回 S 态并按 SPIE 恢复中断使能。
+ */
 int kernel_thread(int (*fn)(void *), void *arg, uint32_t clone_flags)
 {
     struct trapframe tf;
@@ -309,6 +375,11 @@ int kernel_thread(int (*fn)(void *), void *arg, uint32_t clone_flags)
 // copy_mm - process "proc" duplicate OR share "current"'s memory
 // NOTE: in this lab all kernel threads share the kernel address space, so
 //       there is no user memory space to copy; keep the interface for later labs
+/*
+ * 中文导读：copy_mm
+ * 处理新线程的地址空间关系。本实验要求 current->mm 为 NULL，所有内核线程共用内核映射。
+ * 这里返回成功，保留 clone_flags 和 proc 参数供后续用户进程实验扩展。
+ */
 static int copy_mm(uint32_t clone_flags, struct proc_struct *proc)
 {
     assert(current->mm == NULL);
@@ -317,6 +388,12 @@ static int copy_mm(uint32_t clone_flags, struct proc_struct *proc)
 
 // copy_thread - setup the trapframe on the new thread's kernel stack and
 //               the switch context, so that switch_to/forkret can run it
+/*
+ * 中文导读：copy_thread
+ * 在新内核栈高地址处放置 TrapFrame，并复制入口、参数和初始状态。
+ * 检查现场大小与栈对齐；esp=0 时使用当前布置的 TrapFrame 地址作为初始 sp。
+ * context.ra 指向 forkret，context.sp 指向 TrapFrame，让常规切换也能启动从未运行的线程。
+ */
 static void copy_thread(struct proc_struct *proc, uintptr_t esp, struct trapframe *tf)
 {
     // 内核栈布局自检：
@@ -345,6 +422,12 @@ static void copy_thread(struct proc_struct *proc, uintptr_t esp, struct trapfram
 //   3. call copy_mm to dup OR share mm according clone_flags
 //   4. call copy_thread to setup the trapframe and context of child process
 //   5. call get_pid/hash_proc/list_add to register the child, then wakeup_proc it
+/*
+ * 中文导读：do_fork
+ * 创建并登记新线程，成功返回 PID，失败返回负错误码。
+ * 依次分配 PCB、栈、地址空间和初始现场，再在关中断区分配 PID 并加入哈希表与进程链表。
+ * 资源就绪后唤醒为 RUNNABLE；中途失败按获得资源的逆序释放，防止遗留 PCB 或栈。
+ */
 int do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf)
 {
     int ret = -E_NO_FREE_PROC;
@@ -399,6 +482,11 @@ bad_fork_cleanup_proc:
 
 
 //LAB4 function3 2410625
+/*
+ * 中文导读：cpu_idle
+ * 空闲线程的永久执行循环。检测到 need_resched 就调用 schedule，让可运行线程获得 CPU。
+ * 当前实现持续轮询；首次请求由 proc_init 预置，进入后即可启动 init。
+ */
 void
 cpu_idle(void)
 {
@@ -411,6 +499,12 @@ cpu_idle(void)
     }
 }
 
+/*
+ * 中文导读：proc_run
+ * 将 CPU 交给目标线程 proc；目标已是 current 时直接返回。
+ * 关中断后保存旧 PCB、更新 current，按 Sv39 编码目标物理页表根，页表变化时刷新 TLB。
+ * switch_to 换栈后，原调用链挂起；原线程以后恢复时才继续执行下面的中断恢复。
+ */
 void
 proc_run(struct proc_struct *proc)
 {
@@ -422,8 +516,11 @@ proc_run(struct proc_struct *proc)
     bool intr_flag;
     local_intr_save(intr_flag);
     struct proc_struct *prev = current;
+    // 更新 current 前保存旧 PCB，下一步仍需向它写入旧寄存器现场。
     current = proc;
 
+    // MODE 在 [63:60]，Sv39 为 8；PPN 是物理根页表基址右移 12 位，ASID 使用 0。
+    // 两边页表都应覆盖切换代码、PCB 和切换期间使用的内核栈。
     uintptr_t satp_value = ((uintptr_t)SATP_MODE_SV39 << 60) |
                            (proc->pgdir >> RISCV_PGSHIFT);
     if (read_csr(satp) != satp_value)
@@ -432,5 +529,6 @@ proc_run(struct proc_struct *proc)
         flush_tlb();
     }
     switch_to(&prev->context, &proc->context);
+    // 到这里说明原线程再次被选中，使用它自己栈上的 intr_flag 恢复中断。
     local_intr_restore(intr_flag);
 }

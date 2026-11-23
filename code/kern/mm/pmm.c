@@ -35,6 +35,10 @@ static void check_pgdir(void);
 static void check_boot_pgdir(void);
 
 // init_pmm_manager - initialize a pmm_manager instance
+/*
+ * 中文导读：init_pmm_manager
+ * 选择物理页分配器并调用其初始化入口。接口名为 default，当前实际绑定 Best-Fit 实现。
+ */
 static void init_pmm_manager(void)
 {
     pmm_manager = &default_pmm_manager;
@@ -43,6 +47,10 @@ static void init_pmm_manager(void)
 }
 
 // init_memmap - call pmm->init_memmap to build Page struct for free memory
+/*
+ * 中文导读：init_memmap
+ * 把 base 起始的 n 个可用页登记到当前分配器。调用者先排除内核和描述符占用区。
+ */
 static void init_memmap(struct Page *base, size_t n)
 {
     pmm_manager->init_memmap(base, n);
@@ -50,6 +58,11 @@ static void init_memmap(struct Page *base, size_t n)
 
 // alloc_pages - call pmm->alloc_pages to allocate a continuous n*PAGESIZE
 // memory
+/*
+ * 中文导读：alloc_pages
+ * 申请 n 个连续物理页，返回块首页的 Page 指针，失败返回 NULL。
+ * 保存并关闭本 hart 中断后调用分配器，避免本 hart 的中断路径同时改动空闲链表。
+ */
 struct Page *alloc_pages(size_t n)
 {
     struct Page *page = NULL;
@@ -63,6 +76,10 @@ struct Page *alloc_pages(size_t n)
 }
 
 // free_pages - call pmm->free_pages to free a continuous n*PAGESIZE memory
+/*
+ * 中文导读：free_pages
+ * 归还 base 起始的 n 个连续页。通过中断保护调用分配器，后者负责插回并合并相邻空闲块。
+ */
 void free_pages(struct Page *base, size_t n)
 {
     bool intr_flag;
@@ -75,6 +92,10 @@ void free_pages(struct Page *base, size_t n)
 
 // nr_free_pages - call pmm->nr_free_pages to get the size (nr*PAGESIZE)
 // of current free memory
+/*
+ * 中文导读：nr_free_pages
+ * 读取当前空闲物理页总数。读取期间保护本 hart 中断状态，返回的是页数。
+ */
 size_t nr_free_pages(void)
 {
     size_t ret;
@@ -88,6 +109,12 @@ size_t nr_free_pages(void)
 }
 
 //lab2 请补充你在lab2中的代码
+/*
+ * 中文导读：page_init
+ * 根据设备树内存范围建立 Page 描述符数组，数组紧随内核末尾并按页对齐。
+ * 先将页面标为保留，排除内核、描述符和超出内核管理上限的区间，再登记剩余完整空闲页。
+ * 注意 end 是虚拟地址，计算物理布局时使用 PADDR，避免描述符和空闲区重叠。
+ */
 static void page_init(void) {
     // 内核虚拟地址 = 物理地址 + 固定偏移，这个偏移要最先确定
     va_pa_offset = PHYSICAL_MEMORY_OFFSET;
@@ -157,6 +184,11 @@ static void page_init(void) {
     }
 }
 
+/*
+ * 中文导读：enable_paging
+ * 将启动页表物理基址编码为 Sv39 的 satp 值。低位存根页表物理页号，高四位为模式 8。
+ * 调用时必须保证当前取指地址和后续访问地址在目标页表中有有效映射。
+ */
 static void enable_paging(void)
 {
     write_csr(satp, 0x8000000000000000 | (boot_pgdir_pa >> RISCV_PGSHIFT));
@@ -168,6 +200,11 @@ static void enable_paging(void)
 //  size: memory size
 //  pa:   physical address of this memory
 //  perm: permission of this memory
+/*
+ * 中文导读：boot_map_segment
+ * 为 la 开始、size 字节的区间逐页建立到 pa 的映射，perm 指定权限。
+ * 先处理起始地址的页内偏移，通过 get_pte 创建所需下级表，再写入各页的物理页号。
+ */
 static void boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size,
                              uintptr_t pa, uint32_t perm)
 {
@@ -187,6 +224,10 @@ static void boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size,
 // return value: the kernel virtual address of this allocated page
 // note: this function is used to get the memory for PDT(Page Directory
 // Table)&PT(Page Table)
+/*
+ * 中文导读：boot_alloc_page
+ * 启动阶段申请一页并返回其内核虚拟地址。分配失败直接 panic，供启动代码建立必要结构。
+ */
 static void *boot_alloc_page(void)
 {
     struct Page *p = alloc_page();
@@ -200,6 +241,11 @@ static void *boot_alloc_page(void)
 // pmm_init - setup a pmm to manage physical memory, build PDT&PT to setup
 // paging mechanism
 //         - check the correctness of pmm & paging mechanism, print PDT&PT
+/*
+ * 中文导读：pmm_init
+ * 串起物理内存初始化。选择分配器、登记物理页、运行分配自检，取得启动页表地址。
+ * 接着检查页表及内核映射，最后初始化 kmalloc，为创建 PCB 等小对象提供内存。
+ */
 void pmm_init(void)
 {
     // We need to alloc/free the physical memory (granularity is 4KB or other
@@ -242,6 +288,13 @@ void pmm_init(void)
 //  la:     the linear address need to map
 //  create: a logical value to decide if alloc a page for PT
 // return vaule: the kernel virtual address of this pte
+/*
+ * 中文导读：get_pte
+ * 查找线性地址 la 对应的最后一级页表项，pgdir 是根页表虚拟地址。
+ * create 为真时允许申请缺失的两级下级表，为假时缺表返回 NULL。
+ * 新中间表暂存到后续申请成功才发布，第二次申请失败会释放本次新表；目录项只带合法目录标志。
+ * 返回的是页表项地址，调用者还需检查 PTE_V 判断该虚拟页是否已经映射。
+ */
 pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create)
 {
     pde_t *pdep1 = &pgdir[PDX1(la)];
@@ -284,6 +337,11 @@ pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create)
 }
 
 // get_page - get related Page struct for linear address la using PDT pgdir
+/*
+ * 中文导读：get_page
+ * 查找 la 已映射的物理页，缺表或无有效映射时返回 NULL。
+ * ptep_store 非空时同时返回页表项地址，便于调用者清除或修改该项。
+ */
 struct Page *get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store)
 {
     pte_t *ptep = get_pte(pgdir, la, 0);
@@ -299,6 +357,12 @@ struct Page *get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store)
 }
 
 //LAB4 function1 2410849
+/*
+ * 中文导读：page_insert
+ * 将物理页 page 映射到 la，perm 指定权限，成功返回 0，页表分配失败返回 -E_NO_MEM。
+ * 新旧物理页不同时增加新页引用，再写新映射并刷新地址翻译，随后减少旧页引用并按需释放。
+ * 映射同一页只更新权限，不改变引用数；pte_create 会自动设置有效位 PTE_V。
+ */
 int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
 {
     pte_t *ptep = get_pte(pgdir, la, 1);
@@ -321,6 +385,11 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
     return 0;
 }
 
+/*
+ * 中文导读：page_remove
+ * 撤销 la 的有效映射，未映射时直接结束，因此重复移除也安全。
+ * 先清页表项并刷新对应 TLB，再减少物理页引用，引用归零才将物理页交回分配器。
+ */
 void page_remove(pde_t *pgdir, uintptr_t la)
 {
     pte_t *ptep;
@@ -339,6 +408,11 @@ void page_remove(pde_t *pgdir, uintptr_t la)
 
 // invalidate a TLB entry, but only if the page tables being
 // edited are the ones currently in use by the processor.
+/*
+ * 中文导读：tlb_invalidate
+ * 让本 hart 丢弃 la 对应的缓存翻译，x0 表示涵盖全部 ASID。
+ * memory clobber 约束编译器重排相关内存操作；pgdir 参数当前未用于筛选正在使用的页表。
+ */
 void tlb_invalidate(pde_t *pgdir, uintptr_t la)
 {
     // flush_tlb();
@@ -346,12 +420,21 @@ void tlb_invalidate(pde_t *pgdir, uintptr_t la)
     asm volatile("sfence.vma %0, x0" : : "r"(la) : "memory");
 }
 
+/*
+ * 中文导读：check_alloc_page
+ * 执行当前分配器的自检，断言覆盖申请、释放和空闲块管理，完成后输出成功标志。
+ */
 static void check_alloc_page(void)
 {
     pmm_manager->check();
     cprintf("check_alloc_page() succeeded!\n");
 }
 
+/*
+ * 中文导读：check_pgdir
+ * 检查页表查找、创建、替换映射及引用数变化，再回收本次测试使用的页表。
+ * 同时检查非叶目录项没有 U/A/D 标志，符合这里使用的 Sv39 目录格式。
+ */
 static void check_pgdir(void)
 {
     // assert(npage <= KMEMSIZE / PGSIZE);
@@ -414,6 +497,11 @@ static void check_pgdir(void)
     cprintf("check_pgdir() succeeded!\n");
 }
 
+/*
+ * 中文导读：check_boot_pgdir
+ * 通过两个低地址别名映射同一物理页，实际写入和读取字符串验证地址翻译。
+ * 最后回收测试页与下级页表、刷新 TLB，并比较空闲页数是否恢复。
+ */
 static void check_boot_pgdir(void)
 {
     size_t nr_free_store;

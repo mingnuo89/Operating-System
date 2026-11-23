@@ -1,6 +1,7 @@
 #include <riscv.h>
 
     .macro SAVE_ALL
+    # 中文导读：任意指令都可能陷入，保存通用寄存器与 CSR，共 36 槽，RV64 合计 288 字节。
     .align 2
 
     csrw sscratch, sp
@@ -53,6 +54,7 @@
     .endm
 
     .macro RESTORE_ALL
+    # 中文导读：先恢复 CSR，再恢复临时使用的寄存器，sp 最后处理以维持寻址基址。
     #lab3 function1 2410878
     # SAVE_ALL 把 4 个 CSR 放在 trapframe 的 32..35 槽位，
     # 先用 s1~s4 读出来写回 CSR，再把 s1~s4 当普通寄存器恢复。
@@ -112,6 +114,7 @@
 
     .globl __alltraps
 __alltraps:
+    # 硬件通过 stvec 到达这里，保存现场后用 a0 传递 TrapFrame 地址给 trap。
     SAVE_ALL
 
     mv a0, sp
@@ -119,12 +122,14 @@ __alltraps:
 
     .globl __trapret
 __trapret:
+    # 恢复完成后 sret 根据 sepc、SPP 和 SPIE 接续执行位置及中断状态。
     RESTORE_ALL
     # go back from supervisor call
     sret
  
     .globl forkrets
 forkrets:
+    # 新线程首次启动复用 Trap 返回路径。a0 是创建阶段布置的初始 TrapFrame。
     # set stack to this new process's trapframe
     move sp, a0
     j __trapret

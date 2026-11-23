@@ -1,5 +1,7 @@
 # Lab 4 项目结构
 
+中文导读覆盖 process、schedule、mm、trap、sync、init、driver 中的关键函数与汇编入口，以及 tools/test_lab4.c。可按启动、内存管理、创建线程、调度的顺序阅读。
+
 - `kern/process/` 管理进程控制块、内核线程入口和寄存器现场。模块三在 `proc.c` 和 `switch.S` 实现空闲循环及上下文切换。
 - `kern/schedule/sched.c` 实现唤醒和调度选择。`kern/sync/sync.h` 提供本 hart 的中断状态保护。
 - `kern/mm/`、`kern/trap/` 和 `libs/` 提供内存、Trap 与底层运行支持。完整内核构建依赖小组补齐课程框架中的实验空位。

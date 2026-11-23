@@ -6,6 +6,10 @@
 
 volatile size_t ticks;
 
+/*
+ * 中文导读：get_cycles
+ * 读取硬件 time 计数器。RV64 一次读取，RV32 重读高半部保证跨低位溢出时结果一致。
+ */
 static inline uint64_t get_cycles(void) {
 #if __riscv_xlen == 64
     uint64_t n;
@@ -30,6 +34,11 @@ static uint64_t timebase;
  * clock_init - initialize 8253 clock to interrupt 100 times per second,
  * and then enable IRQ_TIMER.
  * */
+/*
+ * 中文导读：clock_init
+ * 按 QEMU 的 10MHz 时基设置约 100Hz 的定时事件，安排首次截止时间并使能时钟中断源。
+ * 清零 ticks 后输出初始化信息；本 hart 的 SIE 总开关由启动流程另外开启。
+ */
 void clock_init(void) {
     // divided by 500 when using Spike(2MHz)
     // divided by 100 when using QEMU(10MHz)
@@ -43,4 +52,9 @@ void clock_init(void) {
     cprintf("++ setup timer interrupts\n");
 }
 
+/*
+ * 中文导读：clock_set_next_event
+ * 用当前硬件时间加 timebase 设置下一次 SBI 定时截止时间。
+ * 每次时钟中断重新调用，才能持续收到后续时钟事件。
+ */
 void clock_set_next_event(void) { sbi_set_timer(get_cycles() + timebase); }

@@ -12,6 +12,10 @@
 
 #define TICK_NUM 100
 
+/*
+ * 中文导读：print_ticks
+ * 输出一次时钟统计。DEBUG_GRADE 构建还会触发测试结束 panic，因此其行为受构建选项影响。
+ */
 static void print_ticks()
 {
     cprintf("%d ticks\n", TICK_NUM);
@@ -22,6 +26,11 @@ static void print_ticks()
 }
 
 /* idt_init - initialize IDT to each of the entry points in kern/trap/vectors.S
+ */
+/*
+ * 中文导读：idt_init
+ * 设置 stvec 指向统一汇编入口，清 sscratch，并开启 S 态访问用户页的 SUM 位。
+ * 该函数准备 Trap 入口，中断总开关由 intr_enable 单独控制。
  */
 void idt_init(void)
 {
@@ -35,6 +44,10 @@ void idt_init(void)
     set_csr(sstatus, SSTATUS_SUM);
 }
 
+/*
+ * 中文导读：print_trapframe
+ * 输出 TrapFrame 中的通用寄存器和异常 CSR，帮助定位出错地址、原因及现场。
+ */
 void print_trapframe(struct trapframe *tf)
 {
     cprintf("trapframe at %p\n", tf);
@@ -45,6 +58,10 @@ void print_trapframe(struct trapframe *tf)
     cprintf("  cause    0x%08x\n", tf->cause);
 }
 
+/*
+ * 中文导读：print_regs
+ * 逐项打印保存的通用寄存器。参数是 TrapFrame 内 gpr 字段的地址。
+ */
 void print_regs(struct pushregs *gpr)
 {
     cprintf("  zero     0x%08x\n", gpr->zero);
@@ -85,6 +102,11 @@ extern struct mm_struct *check_mm_struct;
 
 //lab3 function2 2410625 (merged from lab3; 适配 lab4：本地 ticks 计数，去掉自动关机)
 
+/*
+ * 中文导读：interrupt_handler
+ * 从 cause 屏蔽最高中断标志后分类。S 态时钟中断先安排下一事件，再计数并每百次输出。
+ * 其他已知中断输出类型，未知编号打印完整现场；这里的时钟分支未实现时间片调度。
+ */
 void interrupt_handler(struct trapframe *tf)
 {
     const uintptr_t interrupt_bit = (uintptr_t)1 << (sizeof(uintptr_t) * 8 - 1);
@@ -118,6 +140,11 @@ void interrupt_handler(struct trapframe *tf)
 }
 
 // lab3 function2 2410849：异常处理
+/*
+ * 中文导读：exception_handler
+ * 处理实验中的非法指令和断点，先打印原地址，再读取指令前半字判定跳过 2 或 4 字节。
+ * 读取依赖 epc 地址可访问这一前提；其他异常只打印现场并保留 epc。
+ */
 void exception_handler(struct trapframe *tf)
 {
     switch (tf->cause)
@@ -146,6 +173,11 @@ void exception_handler(struct trapframe *tf)
  * the code in kern/trap/trapentry.S restores the old CPU state saved in the
  * trapframe and then uses the iret instruction to return from the exception.
  * */
+/*
+ * 中文导读：trap
+ * C 层统一分发入口。将 cause 按有符号数解释，最高位为 1 时走中断处理，否则走异常处理。
+ * 返回后汇编恢复现场；修改 tf->epc 会影响最终 sret 的返回位置。
+ */
 void trap(struct trapframe *tf)
 {
     // dispatch based on what type of trap occurred

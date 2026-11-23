@@ -5,11 +5,19 @@
 #include <sched.h>
 #include <stdio.h>
 
+/*
+ * 中文导读：lab4_pass
+ * 统一打印一个测试的 PASS 标志，评分脚本按这些字符串识别通过结果。
+ */
 static void lab4_pass(const char *name)
 {
     cprintf("[Test %s] PASS\n", name);
 }
 
+/*
+ * 中文导读：test_lab4_pmm_basic
+ * 验证首次映射、覆盖旧页、同页改权限及重复删除，检查引用计数和空闲页数。
+ */
 void test_lab4_pmm_basic(void)
 {
     struct Page *p1 = alloc_page();
@@ -44,6 +52,10 @@ void test_lab4_pmm_basic(void)
     lab4_pass("PMM");
 }
 
+/*
+ * 中文导读：test_lab4_process_create
+ * 在首次调度前检查 idle/init 的 PID、状态、亲缘关系、栈和初始上下文。
+ */
 void test_lab4_process_create(void)
 {
     assert(current == idleproc);
@@ -65,6 +77,11 @@ void test_lab4_process_create(void)
 static volatile int test_thread1_ran;
 static volatile int test_thread2_ran;
 
+/*
+ * 中文导读：test_lab4_thread
+ * 用 arg 区分两个工作线程，先设置各自运行标志，然后反复主动调用 schedule。
+ * 永久循环避免进入框架 do_exit，让其他线程能够继续获得调度机会。
+ */
 static void test_lab4_thread(void *arg)
 {
     int id = (int)(intptr_t)arg;
@@ -83,6 +100,11 @@ static void test_lab4_thread(void *arg)
     }
 }
 
+/*
+ * 中文导读：test_lab4_schedule
+ * 创建两个工作线程并让 init 多次让出 CPU，最后断言两者均运行过。
+ * init 能执行最终断言也说明其先前挂起的调度调用能够恢复。
+ */
 void test_lab4_schedule(void)
 {
     int i;

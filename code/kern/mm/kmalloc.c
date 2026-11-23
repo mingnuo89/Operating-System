@@ -198,6 +198,10 @@ void slob_init(void)
 	cprintf("use SLOB allocator\n");
 }
 
+/*
+ * 中文导读：kmalloc_init
+ * 初始化内核小块分配器并打印结果。PCB 等对象通过 kmalloc 从这里提供的接口申请。
+ */
 inline void
 kmalloc_init(void)
 {
@@ -225,6 +229,11 @@ static int find_order(int size)
 	return order;
 }
 
+/*
+ * 中文导读：__kmalloc
+ * 小对象交给 SLOB，并在返回对象前保留管理头；大对象另建记录并申请连续物理页。
+ * 大块申请失败时归还管理记录，避免创建失败留下记录对象。
+ */
 static void *__kmalloc(size_t size, gfp_t gfp)
 {
 	slob_t *m;
@@ -257,12 +266,22 @@ static void *__kmalloc(size_t size, gfp_t gfp)
 	return 0;
 }
 
+/*
+ * 中文导读：kmalloc
+ * 申请 size 字节的内核对象，返回内核虚拟地址，失败返回 NULL。
+ * 内部转入 __kmalloc，具体使用小块管理或连续页取决于申请大小。
+ */
 void *
 kmalloc(size_t size)
 {
 	return __kmalloc(size, 0);
 }
 
+/*
+ * 中文导读：kfree
+ * 释放此前 kmalloc 返回的对象，空指针直接返回。
+ * 先尝试识别大块记录并归还整段物理页；普通小块通过对象前的管理头交给 slob_free 合并。
+ */
 void kfree(void *block)
 {
 	bigblock_t *bb, **last = &bigblocks;

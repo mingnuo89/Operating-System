@@ -17,6 +17,8 @@ enum proc_state
 
 struct context
 {
+    // 普通调用边界的切换现场，与 switch.S 槽位严格对应。
+    // ra 记录接续位置，sp 记录内核调用栈，s0~s11 按 ABI 跨调用保留。
     uintptr_t ra;
     uintptr_t sp;
     uintptr_t s0;
@@ -41,6 +43,8 @@ extern list_entry_t proc_list;
 
 struct proc_struct
 {
+    // PCB 保存线程管理信息；运行者也处于 RUNNABLE，current 标识实际运行者。
+    // context 用于常规切换，tf 用于 Trap 和首次启动，内核线程共用页表且各有内核栈。
     enum proc_state state;        // Process state
     int pid;                      // Process ID
     int runs;                     // the running times of Proces

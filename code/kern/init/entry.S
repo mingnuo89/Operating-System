@@ -4,6 +4,8 @@
     .section .text,"ax",%progbits
     .globl kern_entry
 kern_entry:
+    # 中文导读：保存 hart ID 和设备树地址，启用预置页表，设置栈后跳入 kern_init。
+    # satp 生效后的下一条指令也要有有效映射，移植运行环境时应检查这一条件。
     # a0: hartid
     # a1: dtb physical address
     # save hartid and dtb address
